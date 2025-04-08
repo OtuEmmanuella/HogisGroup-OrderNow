@@ -8,13 +8,18 @@
  * @module
  */
 
+import type * as branches from "../branches.js";
+import type * as brevo from "../brevo.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
-import type * as events from "../events.js";
-import type * as storage from "../storage.js";
-import type * as tickets from "../tickets.js";
+import type * as files from "../files.js";
+import type * as lib_auth from "../lib/auth.js";
+import type * as menu from "../menu.js";
+import type * as orders from "../orders.js";
+import type * as paystack from "../paystack.js";
+import type * as promotions from "../promotions.js";
 import type * as users from "../users.js";
-import type * as waitingList from "../waitingList.js";
+import type * as webhook_actions from "../webhook_actions.js";
 
 import type {
   ApiFromModules,
@@ -31,13 +36,18 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
+  branches: typeof branches;
+  brevo: typeof brevo;
   constants: typeof constants;
   crons: typeof crons;
-  events: typeof events;
-  storage: typeof storage;
-  tickets: typeof tickets;
+  files: typeof files;
+  "lib/auth": typeof lib_auth;
+  menu: typeof menu;
+  orders: typeof orders;
+  paystack: typeof paystack;
+  promotions: typeof promotions;
   users: typeof users;
-  waitingList: typeof waitingList;
+  webhook_actions: typeof webhook_actions;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

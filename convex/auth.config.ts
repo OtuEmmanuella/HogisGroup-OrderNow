@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://possible-kid-73.clerk.accounts.dev",
+      domain: "https://amusing-bobcat-35.clerk.accounts.dev",
       applicationID: "convex",
     },
   ],

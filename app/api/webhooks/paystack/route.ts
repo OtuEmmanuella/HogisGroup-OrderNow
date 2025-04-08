@@ -110,7 +110,7 @@ export async function POST(req: Request) {
      return new Response("Webhook Error: Invalid JSON payload", { status: 400 });
    }
 
-
+  // Initialize Convex Client
   const convex = getConvexClient();
 
   // Handle the charge success event
@@ -118,71 +118,54 @@ export async function POST(req: Request) {
     console.log("Processing charge.success event");
     const chargeData = event.data;
 
-    // Double-check status just in case
+    // Double-check status
     if (chargeData.status !== "success") {
         console.warn(`Received charge.success event but status is ${chargeData.status}. Skipping.`);
-        return new Response("Webhook Warning: Event status mismatch", { status: 200 }); // Acknowledge receipt but don't process
+        return new Response("Webhook Warning: Event status mismatch", { status: 200 });
     }
 
-
-    let metadata: PaystackMetadata;
-    try {
-        // Metadata comes as a stringified JSON, parse it
-         if (typeof chargeData.metadata === 'string' && chargeData.metadata.length > 0) {
-           metadata = JSON.parse(chargeData.metadata);
-           console.log("Parsed metadata:", metadata);
-         } else if (typeof chargeData.metadata === 'object' && chargeData.metadata !== null) {
-             // Allow object metadata but ensure it fits the type
-             metadata = chargeData.metadata as PaystackMetadata;
-             console.warn("Received pre-parsed object metadata:", metadata);
-         }
-          else {
-             console.error("Webhook Error: Missing or invalid metadata in charge data.");
-             return new Response("Webhook Error: Missing or invalid metadata", { status: 400 });
-         }
-
-         // Basic validation of metadata fields
-         if (!metadata.eventId || !metadata.userId || !metadata.waitingListId) {
-             console.error("Webhook Error: Incomplete metadata fields:", metadata);
-              return new Response("Webhook Error: Incomplete metadata", { status: 400 });
-         }
-
-    } catch (err: unknown) { // Changed from any
-        console.error("Webhook Error: Failed to parse metadata JSON:", err);
-        console.error("Received metadata string/object:", chargeData.metadata);
-        return new Response("Webhook Error: Invalid metadata format", { status: 400 });
+    // Extract Paystack Reference
+    const paystackReference = chargeData.reference;
+    if (!paystackReference) {
+        console.error("Webhook Error: Missing reference in charge.success event data.");
+        return new Response("Webhook Error: Missing payment reference", { status: 400 });
     }
+    console.log(`Webhook processing for reference: ${paystackReference}`);
 
-
-    console.log("Calling Convex purchaseTicket mutation with:", {
-        eventId: metadata.eventId,
-        userId: metadata.userId,
-        waitingListId: metadata.waitingListId,
-        paymentRef: chargeData.reference,
-        amount: chargeData.amount // Amount in kobo
-    });
-
-
+    // --- Call Convex Action to handle payment --- 
     try {
-      // Call your Convex mutation to record the purchase
-      const result = await convex.mutation(api.events.purchaseTicket, {
-        eventId: metadata.eventId,
-        userId: metadata.userId,
-        waitingListId: metadata.waitingListId,
-        paymentInfo: {
-          paystackReference: chargeData.reference, // Use the Paystack transaction reference
-          amount: chargeData.amount / 100, // Convert amount from kobo back to main currency unit (e.g., Naira)
-        },
+      // Call the public action, passing the reference
+      const actionResult = await convex.action(api.webhook_actions.handleSuccessfulPayment, {
+          paystackReference: paystackReference 
       });
-      console.log("Convex purchaseTicket mutation completed:", result);
-    } catch (error: unknown) { // Changed from any
-      console.error("Error calling Convex purchaseTicket mutation:", error);
-      return new Response(`Webhook Error: ${error instanceof Error ? error.message : 'Failed to update database'}`, { status: 500 }); // Return specific message
+
+      // Check the result from the action
+      if (actionResult.success) {
+          console.log(`Webhook: Convex action succeeded for reference ${paystackReference}. Message: ${actionResult.message}`);
+          // Action succeeded (order updated or already processed). Return 200 OK.
+          return new Response("Webhook Processed Successfully", { status: 200 });
+      } else {
+          // Action reported a failure (e.g., order not found, internal error)
+          console.warn(`Webhook: Convex action failed for reference ${paystackReference}. Message: ${actionResult.message}`);
+          // If order not found, it's not a server error, return 200.
+          // If it was an internal error within the action, return 500.
+          if (actionResult.message === "Order not found for reference.") {
+              return new Response("Webhook OK: Order not found", { status: 200 });
+          } else {
+              return new Response(`Webhook Processing Error: ${actionResult.message}`, { status: 500 });
+          }
+      }
+
+    } catch (error: unknown) {
+      // Catch errors during the convex.action call itself
+      console.error(`Webhook Error: Failed to call Convex action for reference ${paystackReference}:`, error);
+      return new Response(`Webhook Error: ${error instanceof Error ? error.message : 'Failed to communicate with backend'}`, { status: 500 });
     }
+
   } else {
       console.log(`Received unhandled Paystack event type: ${event.event}`);
   }
 
-  // Acknowledge receipt of the webhook
+  // Acknowledge receipt for unhandled events or if processing reaches here unexpectedly
   return new Response(null, { status: 200 });
 }

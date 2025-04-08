@@ -5,7 +5,6 @@ import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import baseUrl from "@/lib/baseUrl";
 import { auth } from "@clerk/nextjs/server";
-import { WAITING_LIST_STATUS } from "@/convex/constants";
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_API_URL = "https://api.paystack.co";
@@ -17,9 +16,8 @@ if (!PAYSTACK_SECRET_KEY) {
 const convex = getConvexClient();
 
 export type PaystackMetadata = {
-  eventId: Id<"events">;
+  orderId: Id<"orders">;
   userId: string;
-  waitingListId: Id<"waitingList">;
   cancel_action: string;
 };
 
@@ -31,58 +29,43 @@ interface InitializeSuccessData {
 }
 
 export async function initializePaystackTransaction({
-  eventId,
+  orderId,
 }: {
-  eventId: Id<"events">;
+  orderId: Id<"orders">;
 }) {
   const { userId } = await auth();
   if (!userId) throw new Error("Not authenticated");
 
-  // Get event details
-  const event = await convex.query(api.events.getById, { eventId });
-  if (!event) throw new Error("Event not found");
-  if (event.is_cancelled) throw new Error("Event has been cancelled");
+  // Get order details
+  const order = await convex.query(api.orders.getOrderWithDetails, { orderId });
+  if (!order) throw new Error("Order not found");
+  if (order.status !== 'Pending Confirmation') {
+      throw new Error(`Order status is already ${order.status}, cannot initiate payment.`);
+  }
+  if (order.userId !== userId) {
+      throw new Error("User does not match order owner.");
+  }
 
   // Get user details for email
   const user = await convex.query(api.users.getUserById, { userId });
-   if (!user) throw new Error("User not found");
+   if (!user || !user.email) throw new Error("User email not found");
 
-  // Check waiting list status
-  const queuePosition = await convex.query(api.waitingList.getQueuePosition, {
-    eventId,
-    userId,
-  });
-
-  if (!queuePosition || queuePosition.status !== WAITING_LIST_STATUS.OFFERED) {
-    throw new Error(
-      queuePosition?.status === WAITING_LIST_STATUS.WAITING
-        ? "Ticket not offered yet. You are on the waiting list."
-        : "No valid ticket offer found or offer expired."
-    );
+  // Get amount from order
+  if (typeof order.totalAmount !== 'number' || order.totalAmount < 0) {
+      throw new Error("Invalid order total amount.");
   }
-   if (!queuePosition.offerExpiresAt || queuePosition.offerExpiresAt < Date.now()) {
-     throw new Error("Ticket offer has expired.");
+  const amountInKobo = Math.round(order.totalAmount * 100);
+   if (amountInKobo <= 0) {
+       throw new Error("Order total must be positive to initiate payment.");
    }
 
-
-  // Get seller's subaccount code
-  const sellerSubaccountId = await convex.query(
-    api.users.getUsersPaystackSubaccountId,
-    { userId: event.userId } // Get the subaccount of the EVENT CREATOR
-  );
-
-  if (!sellerSubaccountId) {
-    throw new Error("Seller's Paystack account is not set up.");
-  }
-
-  const amountInKobo = Math.round(event.price * 100);
-  const cancelUrl = `${baseUrl}/event/${eventId}`;
+  // Update URLs
+  const cancelUrl = `${baseUrl}/checkout`;
   const callbackUrl = `${baseUrl}/payment/success`;
 
   const metadata: PaystackMetadata = {
-    eventId,
+    orderId,
     userId,
-    waitingListId: queuePosition._id,
     cancel_action: cancelUrl,
   };
 
@@ -92,11 +75,9 @@ export async function initializePaystackTransaction({
       currency: "NGN",
       callback_url: callbackUrl,
       metadata: JSON.stringify(metadata),
-      subaccount: sellerSubaccountId,
-      bearer: "subaccount",
   };
 
-  console.log("Initializing Paystack transaction via fetch with payload:", payload);
+  console.log("Initializing Paystack transaction via fetch for order with payload:", payload);
 
   try {
      const response = await fetch(`${PAYSTACK_API_URL}/transaction/initialize`, {
@@ -125,13 +106,25 @@ export async function initializePaystackTransaction({
          throw new Error(`Paystack API Error (${response.status}): ${responseData?.message || response.statusText}`);
      }
 
-     if (!responseData || !responseData.status || !responseData.data?.authorization_url) {
+     if (!responseData || !responseData.status || !responseData.data?.authorization_url || !responseData.data?.reference) {
          console.error("Invalid Paystack response structure after transaction initialize:", responseData);
          throw new Error(responseData.message || "Failed to initialize transaction or invalid response structure.");
      }
 
     const data = responseData.data as InitializeSuccessData;
     console.log("Paystack transaction initialized successfully via fetch:", data.reference);
+
+    // Save the reference to the order in Convex
+    try {
+        await convex.mutation(api.orders.addPaystackReference, {
+            orderId: orderId,
+            paystackReference: data.reference
+        });
+        console.log(`Saved Paystack reference ${data.reference} to order ${orderId}`);
+    } catch (updateError) {
+        console.error(`Failed to save Paystack reference to order ${orderId}:`, updateError);
+        throw new Error("Payment initialized but failed to update order with payment reference. Please contact support.");
+    }
 
     return {
       authorizationUrl: data.authorization_url,

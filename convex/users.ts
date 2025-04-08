@@ -74,3 +74,42 @@ export const getUserById = query({
     return user;
   },
 });
+
+export const getUserByClerkId = query({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("userId", userId))
+      .first();
+    return user; // Returns the whole user object, including the role
+  },
+});
+
+// Function to ensure user exists in Convex, creating or updating as needed
+// (Keep existing sync logic if present, or add this)
+export const syncUser = mutation({
+  args: { clerkUserId: v.string(), name: v.string(), email: v.string() },
+  handler: async (ctx, { clerkUserId, name, email }) => {
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("userId", clerkUserId))
+      .first();
+
+    if (existingUser) {
+      // Optional: Update name/email if changed in Clerk
+      if (existingUser.name !== name || existingUser.email !== email) {
+        await ctx.db.patch(existingUser._id, { name, email });
+      }
+      return existingUser._id;
+    } else {
+      // Create new user, defaulting role to 'customer'
+      return await ctx.db.insert("users", {
+        userId: clerkUserId,
+        name: name,
+        email: email,
+        role: "customer", // Default new users to 'customer'
+      });
+    }
+  },
+});

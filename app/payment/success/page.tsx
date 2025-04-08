@@ -1,47 +1,53 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import React from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { CheckCircle } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckCircle2 } from 'lucide-react';
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-  const transactionRef = searchParams.get('trxref') || searchParams.get('reference');
-
-  // Optional: You could add logic here to verify the transaction
-  // using the reference with your backend if needed, but often
-  // relying solely on the webhook is sufficient and more reliable.
-
-  useEffect(() => {
-    // Redirect if no reference is found, likely means direct access
-    if (!transactionRef) {
-       console.warn('No transaction reference found on success page. Redirecting home.');
-       // Optional: redirect to home or an error page
-       // router.push('/');
-    }
-  }, [transactionRef, router]);
+  const orderId = searchParams.get('orderId');
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4 text-center">
-      <CheckCircle className="w-16 h-16 text-green-500 mb-6" />
-      <h1 className="text-3xl font-bold text-gray-800 mb-3">Payment Successful!</h1>
-      <p className="text-lg text-gray-600 mb-6">
-        Your ticket purchase is being processed. You will receive confirmation shortly.
-      </p>
-      {transactionRef && (
-        <p className="text-sm text-gray-500 mb-8">
-          Transaction Reference: {transactionRef}
+    <div className="container mx-auto px-4 py-16 flex justify-center items-center">
+      <Card className="w-full max-w-md text-center">
+        <CardHeader>
+          <div className="mx-auto bg-green-100 rounded-full p-3 w-fit">
+              <CheckCircle2 className="h-10 w-10 text-green-600" />
+          </div>
+          <CardTitle className="mt-4">Payment Successful!</CardTitle>
+          <CardDescription>
+            Your order has been received and is being processed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {orderId ? (
+            <p className="text-sm text-muted-foreground">
+              Your Order ID is: {orderId}
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+                Your order is confirmed.
         </p>
       )}
-      <Link href="/tickets">
-        <Button size="lg">View My Tickets</Button>
+          
+          {orderId && (
+            <Button asChild className="w-full">
+              <Link href={`/orders/${orderId}`}>
+                Track Your Order
       </Link>
+            </Button>
+          )}
+          <Button variant="outline" asChild className="w-full">
       <Link href="/">
-         <Button variant="link" className="mt-4">Go to Homepage</Button>
+              Place Another Order
       </Link>
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 } 
