@@ -3,22 +3,19 @@ import { getConvexClient } from "@/lib/convex";
 import { api } from "@/convex/_generated/api";
 import crypto from "crypto";
 
-// Define expected Clerk webhook event structure
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+// Define the Clerk webhook event type
 interface ClerkEvent {
+  type: string;
   data: {
     id: string;
-    email_addresses?: Array<{
-      email_address: string;
-      id: string;
-    }>;
+    email_addresses?: Array<{ email_address: string }>;
     first_name?: string;
     last_name?: string;
-    created_at?: number;
-    updated_at?: number;
-    [key: string]: unknown;
+    // Add other properties as needed based on Clerk's webhook data structure
   };
-  object: string;
-  type: string;
 }
 
 export async function POST(req: Request) {
@@ -113,4 +110,16 @@ export async function POST(req: Request) {
   
   // Acknowledge receipt for unhandled events
   return new Response(null, { status: 200 });
+}
+
+// Add OPTIONS handler for CORS preflight
+export async function OPTIONS(req: Request) {
+  return new Response(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, svix-id, svix-signature, svix-timestamp',
+    }
+  });
 }

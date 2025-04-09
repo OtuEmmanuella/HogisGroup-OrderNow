@@ -226,6 +226,73 @@ export const sendWelcomeEmail = action({
       text-align: center;
     }
     
+    .features-image {
+      width: 100%;
+      max-height: 180px;
+      object-fit: cover;
+      border-radius: 8px;
+      margin-top: 24px;
+    }
+    
+    .locations-section {
+      padding: 32px 24px;
+      text-align: center;
+    }
+    
+    .locations-title {
+      margin: 0 0 24px;
+      font-family: 'Oldschool Grotesk', serif;
+      font-weight: 800;
+      font-size: 22px;
+      color: #7b1113;
+      text-align: center;
+    }
+    
+    .locations-intro {
+      margin: 0 0 24px;
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+      color: #505050;
+    }
+    
+    .location-container {
+      margin-bottom: 24px;
+    }
+    
+    .location-card {
+      background-color: #ffffff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    
+    .location-image {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+    }
+    
+    .location-details {
+      padding: 16px;
+    }
+    
+    .location-name {
+      margin: 0 0 8px;
+      font-family: 'Oldschool Grotesk', serif;
+      font-weight: 800;
+      font-size: 18px;
+      color: #7b1113;
+    }
+    
+    .location-amenities {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #505050;
+    }
+    
     .testimonial-section {
       padding: 32px 24px;
       background-color: #f9f3e8; /* light cream */
@@ -366,6 +433,14 @@ export const sendWelcomeEmail = action({
       color: #707070;
     }
     
+    .subscription-notice {
+      margin: 16px 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      color: #909090;
+      font-style: italic;
+    }
+    
     .social-links {
       margin-bottom: 16px;
     }
@@ -414,6 +489,21 @@ export const sendWelcomeEmail = action({
       .feature-box {
         margin: 0 8px;
       }
+      
+      .location-container {
+        display: table;
+        width: 100%;
+      }
+      
+      .location-column {
+        display: table-cell;
+        width: 33.33%;
+        vertical-align: top;
+      }
+      
+      .location-card {
+        margin: 0 8px;
+      }
     }
   </style>
 </head>
@@ -428,7 +518,7 @@ export const sendWelcomeEmail = action({
     <div class="hero-section">
       <h2>Welcome to <span>OrderNow</span>, ${name}!</h2>
       <p>Thank you for joining our platform. Your premium food ordering experience begins today. Enjoy seamless ordering with our exclusive service.</p>
-      <img class="hero-image" src="${baseUrl}/images/premium-dining.jpg" alt="Premium dining experience">
+      <img class="hero-image" src="https://images.unsplash.com/photo-1582562124811-c09040d0a901?auto=format&fit=crop&q=80&w=800" alt="Premium dining experience">
       <a href="${baseUrl}" class="cta-button">Place Your Order</a>
     </div>
     
@@ -440,7 +530,7 @@ export const sendWelcomeEmail = action({
         <div class="feature-column">
           <div class="feature-box">
             <div class="feature-icon">
-              <img src="${baseUrl}/images/icons/clock.png" alt="Quick Delivery">
+              <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/clock.svg" alt="Quick Delivery">
             </div>
             <h3>Quick Delivery</h3>
             <p>Your orders delivered promptly to your doorstep, every time.</p>
@@ -450,7 +540,7 @@ export const sendWelcomeEmail = action({
         <div class="feature-column">
           <div class="feature-box">
             <div class="feature-icon">
-              <img src="${baseUrl}/images/icons/utensils.png" alt="Premium Selection">
+              <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/utensils.svg" alt="Premium Selection">
             </div>
             <h3>Premium Selection</h3>
             <p>Curated menu options from the finest restaurants in your area.</p>
@@ -460,10 +550,72 @@ export const sendWelcomeEmail = action({
         <div class="feature-column">
           <div class="feature-box">
             <div class="feature-icon">
-              <img src="${baseUrl}/images/icons/credit-card.png" alt="Secure Payment">
+              <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/credit-card.svg" alt="Secure Payment">
             </div>
             <h3>Secure Payment</h3>
             <p>Safe and convenient payment methods for peace of mind.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="feature-container" style="margin-top: 16px;">
+        <div class="feature-column">
+          <div class="feature-box">
+            <div class="feature-icon">
+              <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/map-pin.svg" alt="Real-time Tracking">
+            </div>
+            <h3>Real-time Tracking</h3>
+            <p>Monitor your order from preparation to delivery with live updates.</p>
+          </div>
+        </div>
+        
+        <div class="feature-column">
+          <div class="feature-box">
+            <div class="feature-icon">
+              <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/users.svg" alt="Shared Cart">
+            </div>
+            <h3>Shared Cart</h3>
+            <p>Create group orders with friends and family for a shared dining experience.</p>
+          </div>
+        </div>
+      </div>
+      
+      <img class="features-image" src="https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&q=80&w=800" alt="Delicious food being prepared">
+    </div>
+    
+    <!-- Hogis Locations Section -->
+    <div class="locations-section">
+      <h2 class="locations-title">Our Calabar Branches</h2>
+      <p class="locations-intro">Hogis Group is proud to offer three exceptional properties in Calabar, each with unique amenities and experiences.</p>
+      
+      <div class="location-container">
+        <div class="location-column">
+          <div class="location-card">
+            <img class="location-image" src="https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=800" alt="Hogis Luxury Suites">
+            <div class="location-details">
+              <h3 class="location-name">Hogis Luxury Suites</h3>
+              <p class="location-amenities">Features: Gym, Restaurant, Cafe, Lounge, Hall</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="location-column">
+          <div class="location-card">
+            <img class="location-image" src="https://images.unsplash.com/photo-1590381105924-c72589b9ef3f?auto=format&fit=crop&q=80&w=800" alt="Hogis Royale & Apartment">
+            <div class="location-details">
+              <h3 class="location-name">Hogis Royale & Apartment</h3>
+              <p class="location-amenities">Features: Cinema, Restaurant, Banquet Hall, Club Voltage, Lounges</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="location-column">
+          <div class="location-card">
+            <img class="location-image" src="https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?auto=format&fit=crop&q=80&w=800" alt="Hogis Exclusive Suites">
+            <div class="location-details">
+              <h3 class="location-name">Hogis Exclusive Suites</h3>
+              <p class="location-amenities">Features: Restaurant, Lounge</p>
+            </div>
           </div>
         </div>
       </div>
@@ -480,9 +632,9 @@ export const sendWelcomeEmail = action({
       </div>
       
       <div class="testimonial-author">
-        <img class="author-image" src="${baseUrl}/images/testimonials/sarah-johnson.jpg" alt="Sarah Johnson">
-        <p class="author-name">Sarah Johnson</p>
-        <p class="author-title">Executive Director, Anvil Corp</p>
+        <img class="author-image" src="https://images.unsplash.com/photo-1721322800607-8c38375eef04?auto=format&fit=crop&q=80&w=200" alt="Emmanuella Otu">
+        <p class="author-name">Emmanuella Otu</p>
+        <p class="author-title">Data Analyst | M & E Officer, Hogis Group</p>
       </div>
     </div>
     
@@ -501,13 +653,13 @@ export const sendWelcomeEmail = action({
     <div class="footer">
       <div class="social-links">
         <a href="${baseUrl}/social/facebook" class="social-icon">
-          <img src="${baseUrl}/images/icons/facebook.png" alt="Facebook">
+          <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/facebook.svg" alt="Facebook">
         </a>
         <a href="${baseUrl}/social/twitter" class="social-icon">
-          <img src="${baseUrl}/images/icons/twitter.png" alt="Twitter">
+          <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/twitter.svg" alt="Twitter">
         </a>
         <a href="${baseUrl}/social/instagram" class="social-icon">
-          <img src="${baseUrl}/images/icons/instagram.png" alt="Instagram">
+          <img src="https://cdnjs.cloudflare.com/ajax/libs/lucide-react/0.263.1/icons/instagram.svg" alt="Instagram">
         </a>
       </div>
       
@@ -518,6 +670,7 @@ export const sendWelcomeEmail = action({
       </div>
       
       <p>&copy; ${new Date().getFullYear()} Hogis Group. All rights reserved.</p>
+      <p class="subscription-notice">You are receiving this email because you signed up for the Hogis Group OrderNow service.</p>
     </div>
   </div>
 </body>
