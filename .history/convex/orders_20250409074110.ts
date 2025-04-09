@@ -77,6 +77,7 @@ export const updateOrderStatus = mutation({
     }
     await ctx.db.patch(orderId, { status });
     try {
+        await ctx.scheduler.runAfter(0, api.brevo.sendOrderStatusUpdateEmail, { orderId });
     } catch (error) {
         console.error(`Failed to schedule status update email for order ${orderId}:`, error);
     }
@@ -310,6 +311,7 @@ export const createOrder = mutation({
 
     // --- Schedule notification --- 
     try {
+        await ctx.scheduler.runAfter(0, api.brevo.sendOrderStatusUpdateEmail, { orderId: newOrderId }); 
         console.log(`[CONVEX M(orders:createOrder)] Scheduled confirmation email for order ${newOrderId}.`);
     } catch (error) {
         console.error(`[CONVEX M(orders:createOrder)] Failed to schedule confirmation email for order ${newOrderId}:`, error);
@@ -415,6 +417,7 @@ export const updateOrderStatusInternal = internalMutation({
 
         // Schedule email notification if status changed
         try {
+            await ctx.scheduler.runAfter(0, api.brevo.sendOrderStatusUpdateEmail, { orderId });
             console.log(`[CONVEX IM(orders:updateOrderStatusInternal)] Scheduled status update email for ${orderId}`);
         } catch (error) {
             console.error(`[CONVEX IM(orders:updateOrderStatusInternal)] Failed to schedule email for order ${orderId}:`, error);

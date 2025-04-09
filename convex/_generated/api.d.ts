@@ -9,9 +9,9 @@
  */
 
 import type * as branches from "../branches.js";
-import type * as brevo from "../brevo.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
+import type * as email from "../email.js";
 import type * as files from "../files.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as menu from "../menu.js";
@@ -37,9 +37,9 @@ import type {
  */
 declare const fullApi: ApiFromModules<{
   branches: typeof branches;
-  brevo: typeof brevo;
   constants: typeof constants;
   crons: typeof crons;
+  email: typeof email;
   files: typeof files;
   "lib/auth": typeof lib_auth;
   menu: typeof menu;

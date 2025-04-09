@@ -53,4 +53,51 @@ export const handleSuccessfulPayment = action({
             return { success: false, message: error instanceof Error ? error.message : "An internal error occurred." };
         }
     },
-}); 
+});
+
+/**
+ * Public action called by the Clerk webhook handler (Next.js route)
+ * after a user creation event is verified.
+ *
+ * This action sends a welcome email to the new user and ensures
+ * the user is properly synced with Convex.
+ */
+export const handleUserCreated = action({
+    args: {
+        userId: v.string(),
+        email: v.string(),
+        name: v.string(),
+    },
+    handler: async (ctx, { userId, email, name }): Promise<{ success: boolean; message: string }> => {
+        console.log(`[CONVEX ACTION(handleUserCreated)] Processing user creation: ${userId}`);
+
+        try {
+            // 1. Ensure user exists in Convex database
+            await ctx.runMutation(api.users.syncUser, {
+                clerkUserId: userId,
+                name: name,
+                email: email,
+            });
+            console.log(`[CONVEX ACTION(handleUserCreated)] User ${userId} synced with Convex.`);
+
+            // 2. Send welcome email
+            const emailResult = await ctx.runAction(api.email.sendWelcomeEmail, {
+                userId,
+                email,
+                name,
+            });
+
+            if (!emailResult.success) {
+                console.warn(`[CONVEX ACTION(handleUserCreated)] Failed to send welcome email to ${email}: ${emailResult.message}`);
+                return { success: false, message: `User synced but email failed: ${emailResult.message}` };
+            }
+
+            console.log(`[CONVEX ACTION(handleUserCreated)] Welcome email sent to ${email}.`);
+            return { success: true, message: "User created and welcome email sent successfully." };
+
+        } catch (error: unknown) {
+            console.error(`[CONVEX ACTION(handleUserCreated)] Error processing user ${userId}:`, error);
+            return { success: false, message: error instanceof Error ? error.message : "An internal error occurred." };
+        }
+    },
+});

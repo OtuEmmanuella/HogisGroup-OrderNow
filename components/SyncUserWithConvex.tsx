@@ -2,30 +2,46 @@
 
 import { api } from "@/convex/_generated/api";
 import { useUser } from "@clerk/nextjs";
-import { useMutation } from "convex/react";
-import { useEffect } from "react";
+import { useMutation, useAction } from "convex/react";
+import { useEffect, useState } from "react";
 
 export default function SyncUserWithConvex() {
-  const { user } = useUser();
+  const { user, isLoaded } = useUser();
   const updateUser = useMutation(api.users.updateUser);
+  const handleUserCreated = useAction(api.webhook_actions.handleUserCreated);
+  const [hasTriggeredWelcome, setHasTriggeredWelcome] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !isLoaded) return;
 
     const syncUser = async () => {
       try {
+        // Sync user data with Convex
         await updateUser({
           userId: user.id,
           name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
           email: user.emailAddresses[0]?.emailAddress ?? "",
         });
+
+        // As a fallback, also trigger welcome email directly if not already sent
+        if (!hasTriggeredWelcome) {
+          const email = user.emailAddresses[0]?.emailAddress;
+          if (email) {
+            await handleUserCreated({
+              userId: user.id,
+              email: email,
+              name: `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+            });
+            setHasTriggeredWelcome(true);
+          }
+        }
       } catch (error) {
         console.error("Error syncing user:", error);
       }
     };
 
     syncUser();
-  }, [user, updateUser]);
+  }, [user, isLoaded, updateUser, handleUserCreated, hasTriggeredWelcome]);
 
   return null;
 }
