@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server';
 // Define routes that should be publicly accessible
 const isPublicRoute = createRouteMatcher([
   '/',             // Homepage
-  '/api/webhook',  // Webhook endpoint
+  '/api/webhook(.*)',  // Any path starting with /api/webhook
+  '/api/webhooks/clerk', // Clerk webhook endpoint specifically
   '/api/trpc(.*)', // tRPC API routes
   '/sign-in(.*)',  // Sign-in page and its subpaths
   '/sign-up(.*)',  // Sign-up page and its subpaths
