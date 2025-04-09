@@ -93,7 +93,7 @@ export const handleUserCreated = action({
             }
 
             console.log(`[CONVEX ACTION(handleUserCreated)] Welcome email sent to ${email}.`);
-            return { success: true, message: "User created and welcome email sent successfully." };
+            return { success: true, message: "User created and welcome email Successful." };
 
         } catch (error: unknown) {
             console.error(`[CONVEX ACTION(handleUserCreated)] Error processing user ${userId}:`, error);
