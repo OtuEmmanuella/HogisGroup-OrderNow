@@ -5,12 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import logo from "@/images/logo.png";
 import SearchBar from "./SearchBar";
-import { ShoppingBag, MapPin, Menu as MenuIcon, X } from "lucide-react";
+import { ShoppingBag, MapPin, Menu as MenuIcon, X, Users } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useOrderContext } from "@/context/OrderContext";
-import { useUIContext } from "@/context/UIContext"; // Import UIContext
-import { cn } from "@/lib/utils"; // Import cn
-import { motion, AnimatePresence } from "framer-motion"; // Import framer-motion
+import { useUIContext } from "@/context/UIContext";
+import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "./ui/button";
+import { toast } from "sonner"; // Import toast
 
 // Moved outside Header to avoid re-declaration on every render
 // Helper component for cart icon content, handles client-side hydration
@@ -38,8 +40,10 @@ const CartButtonContent = () => {
 
 function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { totalItems } = useOrderContext();
-  const { openCartDrawer } = useUIContext(); // Get open function
+  const { totalItems, activeSharedCartId } = useOrderContext(); // Get activeSharedCartId
+  const { openCartDrawer } = useUIContext();
+
+  const changeLocationDisabled = !!activeSharedCartId; // Disable if in a shared cart
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-sm">
@@ -47,7 +51,7 @@ function Header() {
         {/* Main Header */}
         <div className="flex items-center justify-between px-4 py-3">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/home" className="flex items-center gap-2">
             <Image
               src={logo}
               alt="Hogis"
@@ -59,20 +63,42 @@ function Header() {
             <span className="font-bold text-xl hidden md:block text-[#141414]">Hogis</span>
           </Link>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation & Shared Cart Link */}
           <nav className="hidden md:flex items-center gap-6">
+            {/* Show Return to Group Order button if active */}
+            {activeSharedCartId && (
+                <Link href={`/shared-cart/${activeSharedCartId}`} passHref>
+                    <Button variant="outline" size="sm" className="text-[#F96521] border-[#F96521] hover:bg-[#F96521]/10">
+                        <Users className="mr-2 h-4 w-4" />
+                        Return to Group Order
+                    </Button>
+                </Link>
+            )}
             <Link href="/about" className="text-gray-700 hover:text-[#F96521] font-medium text-sm transition-colors">
               About Us
             </Link>
-            <Link href="/start-ordering" className="text-gray-700 hover:text-[#F96521] font-medium text-sm transition-colors flex items-center gap-1">
+            {/* Add My Profile link to desktop nav */}
+            <Link href="/profile" className="text-gray-700 hover:text-[#F96521] font-medium text-sm transition-colors">
+              My Orders
+            </Link>
+            {/* Conditionally render Change Location link */}
+            <Link
+              href="/start-ordering"
+              className={cn(
+                "text-gray-700 hover:text-[#F96521] font-medium text-sm transition-colors flex items-center gap-1",
+                changeLocationDisabled && "opacity-50 cursor-not-allowed pointer-events-none" // Style when disabled
+              )}
+              aria-disabled={changeLocationDisabled}
+              onClick={(e) => { if (changeLocationDisabled) e.preventDefault(); }} // Prevent navigation if disabled
+            >
               <MapPin size={16} />
-              Change Location
+              Select Branch
             </Link>
           </nav>
 
           {/* Right Actions */}
           <div className="flex items-center gap-2 md:gap-4">
-            {/* Cart Button - Desktop (Button to open drawer) */}
+            {/* Cart Button - Desktop */}
             <button
               className={cn("hidden md:block")}
               onClick={openCartDrawer}
@@ -80,8 +106,8 @@ function Header() {
             >
               <CartButtonContent />
             </button>
-            
-            {/* Cart Button - Mobile (Button to open drawer) */}
+
+            {/* Cart Button - Mobile */}
             <button
               className={cn("md:hidden")}
               onClick={openCartDrawer}
@@ -93,7 +119,7 @@ function Header() {
             {/* User Account */}
             <div className="hidden md:block">
               <SignedIn>
-                <UserButton afterSignOutUrl="/" />
+                <UserButton afterSignOutUrl="/home" />
               </SignedIn>
               <SignedOut>
                 <SignInButton mode="modal">
@@ -111,7 +137,6 @@ function Header() {
               aria-label="Toggle mobile menu"
             >
               <div className="relative w-6 h-6">
-                {/* Animated from burger to X */}
                 <motion.div
                   animate={isMenuOpen ? { opacity: 0, y: 0, rotate: 45 } : { opacity: 1, y: 0, rotate: 0 }}
                   transition={{ duration: 0.2 }}
@@ -139,23 +164,34 @@ function Header() {
         {/* Mobile Menu - With improved animation */}
         <AnimatePresence>
           {isMenuOpen && (
-            <motion.div 
+            <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ 
-                duration: 0.3, 
+              transition={{
+                duration: 0.3,
                 ease: "easeInOut",
                 opacity: { duration: 0.2 }
               }}
               className="md:hidden px-4 py-0 border-t bg-white overflow-hidden"
             >
-              <motion.div 
+              <motion.div
                 initial={{ y: -10, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 0.3, delay: 0.1, staggerChildren: 0.1 }}
                 className="flex flex-col space-y-3 py-3"
               >
+                {/* Mobile Return to Group Order Link */}
+                {activeSharedCartId && (
+                    <Link
+                      href={`/shared-cart/${activeSharedCartId}`}
+                      className="flex items-center gap-2 text-[#F96521] font-medium py-2 px-3 rounded-md bg-[#F96521]/10 hover:bg-[#F96521]/20 transition-colors"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Users size={16} />
+                      Return to Group Order
+                    </Link>
+                )}
                 <Link
                   href="/about"
                   className="flex items-center gap-2 text-gray-700 py-2 px-3 rounded-md hover:bg-gray-50 transition-colors"
@@ -163,34 +199,45 @@ function Header() {
                 >
                   About Us
                 </Link>
+                {/* Conditionally render Change Location link */}
                 <Link
                   href="/start-ordering"
-                  className="flex items-center gap-2 text-gray-700 py-2 px-3 rounded-md hover:bg-gray-50 transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-2 text-gray-700 py-2 px-3 rounded-md hover:bg-gray-50 transition-colors",
+                    changeLocationDisabled && "opacity-50 cursor-not-allowed pointer-events-none" // Style when disabled
+                  )}
+                  aria-disabled={changeLocationDisabled}
+                  onClick={(e) => {
+                    if (changeLocationDisabled) {
+                      e.preventDefault();
+                      toast.info("Cannot change location while in a group order."); // Optional feedback
+                    } else {
+                      setIsMenuOpen(false);
+                      localStorage.setItem('onboardingStep', 'selectBranch');
+                    }
+                  }}
                 >
                   <MapPin size={16} />
-                  Change Location
+                  Select Branch
                 </Link>
                 <Link
-                  href="/orders"
+                  href="/profile"
                   className="flex items-center gap-2 text-gray-700 py-2 px-3 rounded-md hover:bg-gray-50 transition-colors"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   My Orders
                 </Link>
-                {/* Optional: Trigger cart from dropdown too */}
                 <button
                   className="flex items-center gap-2 text-gray-700 py-2 px-3 rounded-md hover:bg-gray-50 text-left transition-colors"
                   onClick={() => { openCartDrawer(); setIsMenuOpen(false); }}
                 >
                   <ShoppingBag size={18} />
-                  {/* Display count text conditionally after hydration */}
                   View Cart {isMenuOpen && totalItems > 0 ? `(${totalItems})` : ''}
                 </button>
                 <SignedIn>
                   <div className="pt-2 border-t flex items-center justify-between">
                     <span className="text-sm text-gray-500">Account</span>
-                    <UserButton afterSignOutUrl="/" />
+                    <UserButton afterSignOutUrl="/home" />
                   </div>
                 </SignedIn>
                 <SignedOut>

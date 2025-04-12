@@ -2,7 +2,7 @@ import { query, mutation, internalMutation, internalQuery } from "./_generated/s
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel"; // Import Id
-import { ensureAdmin } from "./lib/auth"; // Import the helper
+import { ensureAdmin, getUserFromAuth } from "./lib/auth"; // Import the helper
 
 // Fetch all orders for a specific user
 export const getUserOrders = query({
@@ -257,7 +257,7 @@ export const createOrder = mutation({
          console.warn("[CONVEX M(orders:createOrder)] Take-out order created without pickup time.");
         // throw new Error("Pickup time is required for take-out orders.");
     }
-    if (args.orderType === 'Dine-In' && (!args.dineInDateTime || !args.dineInGuests || !args.dineInReservationType)) {
+    if (args.orderType === 'Dine-In' && (!args.dineInDateTime || args.dineInGuests || !args.dineInReservationType)) {
          console.warn("[CONVEX M(orders:createOrder)] Dine-In order created without required details (Date/Time, Guests, Type).");
          // Depending on strictness, could throw Error here
          // throw new Error("Date/Time, number of guests, and reservation type are required for Dine-In orders.");
@@ -317,6 +317,7 @@ export const createOrder = mutation({
     }
 
     console.log(`[CONVEX M(orders:createOrder)] Order creation process complete for ID: ${newOrderId}`);
+    await ctx.scheduler.runAfter(0, api.actions.updateUserActivity, { userId: args.userId });
     return newOrderId;
   },
 });
@@ -328,38 +329,46 @@ export const createOrder = mutation({
 
 // Query for Admin view - Fetch orders with basic related info
 export const getOrdersAdmin = query({
-  args: {
-    // Add filter arguments later if needed
-    // branchId: v.optional(v.id("branches")),
-    // status: v.optional(v.string()),
-  },
+  args: {},
   handler: async (ctx, args) => {
     await ensureAdmin(ctx); // <-- Add auth check
-    let ordersQuery = ctx.db.query("orders").order("desc");
 
-    // TODO: Apply filters based on args if added later
-    // Example filter:
-    // if (args.branchId) {
-    //    ordersQuery = ordersQuery.withIndex("by_branch_status", q => q.eq("branchId", args.branchId));
-    // } 
-    // if (args.status) { ... filter by status ... }
+    // Fetch regular orders
+    const orders = await ctx.db.query("orders").order("desc").collect();
 
-    const orders = await ordersQuery.collect();
+    // Fetch shared carts (treating them as "orders" for the admin view)
+    const sharedCarts = await ctx.db.query("sharedCarts").order("desc").collect();
 
-    // Enrich with Branch Name and User Email for display
-    const ordersWithDetails = await Promise.all(
-      orders.map(async (order) => {
+    // Combine and enrich both types of orders
+    const allOrders = await Promise.all([
+      ...orders.map(async (order) => {
         const branch = await ctx.db.get(order.branchId);
         const user = await ctx.db.query("users").withIndex("by_user_id", q => q.eq("userId", order.userId)).first();
         return {
           ...order,
+          _type: "order", // Add a type to distinguish between regular orders and shared carts
           branchName: branch?.name ?? "Unknown Branch",
           userEmail: user?.email ?? "Unknown User",
         };
-      })
-    );
+      }),
+      ...sharedCarts.map(async (cart) => {
+        // For shared carts, we'll use the initiator's info as the "user"
+        const user = await ctx.db.query("users").withIndex("by_user_id", q => q.eq("userId", cart.initiatorId)).first();
+        const branch = cart.branchId ? await ctx.db.get(cart.branchId) : null;
+        return {
+          ...cart,
+          _type: "sharedCart", // Add a type to distinguish between regular orders and shared carts
+          branchName: branch?.name ?? "Unknown Branch",
+          userEmail: user?.email ?? "Unknown User",
+          totalAmount: cart.totalAmount, // Ensure totalAmount is included
+        };
+      }),
+    ]);
 
-    return ordersWithDetails;
+    // Sort all orders by creation time (descending)
+    allOrders.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+
+    return allOrders;
   },
 });
 
@@ -444,3 +453,138 @@ export const getOrderByPaystackReference = internalQuery({
 
 // ... getBranchSalesAnalytics query ...
 
+/**
+ * Reorders items from a past order.
+ * Fetches items from the specified order, checks current availability and price,
+ * and returns a list of items that can be added to a new cart.
+ * Requires authenticated user to own the original order.
+ */
+export const reorderItems = mutation({
+    args: { orderId: v.id("orders") },
+    handler: async (ctx, args) => {
+        const user = await getUserFromAuth(ctx);
+        if (!user) {
+            throw new Error("Authentication required to reorder items.");
+        }
+
+        // 1. Fetch the original order
+        const originalOrder = await ctx.db.get(args.orderId);
+        if (!originalOrder) {
+            throw new Error("Original order not found.");
+        }
+
+        // 2. Verify user ownership
+        if (originalOrder.userId !== user.userId) {
+            throw new Error("You can only reorder your own past orders.");
+        }
+
+        // 3. Process items: Check current availability and price
+        const itemsToAdd = [];
+        const unavailableItems: string[] = [];
+
+        for (const item of originalOrder.items) {
+            const menuItem = await ctx.db.get(item.menuItemId);
+
+            if (menuItem && menuItem.isAvailable) {
+                itemsToAdd.push({
+                    _id: menuItem._id, // Use the actual menuItem ID
+                    name: menuItem.name,
+                    price: menuItem.price, // Use the CURRENT price
+                    quantity: item.quantity, // Use the original quantity
+                });
+            } else {
+                unavailableItems.push(item.name ?? `Item ID: ${item.menuItemId}`);
+            }
+        }
+
+        if (itemsToAdd.length === 0) {
+            return {
+                success: false,
+                message: "None of the items from the original order are currently available.",
+                items: [],
+                unavailableItems: unavailableItems,
+            };
+        }
+
+        let message = "Items ready to be added to cart.";
+        if (unavailableItems.length > 0) {
+            message = `Some items were unavailable: ${unavailableItems.join(", ")}. Available items ready.`;
+        }
+
+        return {
+            success: true,
+            message: message,
+            items: itemsToAdd, // Return items with current price and original quantity
+            unavailableItems: unavailableItems,
+        };
+    },
+});
+
+/**
+ * Fetches detailed data needed to generate an invoice for a specific order.
+ * Requires the user to be authenticated and either own the order or be an admin.
+ */
+export const getInvoiceData = query({
+    args: { orderId: v.id("orders") },
+    handler: async (ctx, args) => {
+        const user = await getUserFromAuth(ctx); // Check authentication first
+        if (!user) {
+            throw new Error("Authentication required to view invoice.");
+        }
+
+        const order = await ctx.db.get(args.orderId);
+        if (!order) {
+            throw new Error("Order not found.");
+        }
+
+        // Authorization check: User must own the order OR be an admin
+        if (order.userId !== user.userId && user.role !== "admin") {
+            throw new Error("Not authorized to view this invoice.");
+        }
+
+        // Fetch related data
+        const branch = await ctx.db.get(order.branchId);
+        const orderUser = await ctx.db.query("users")
+                                   .withIndex("by_user_id", q => q.eq("userId", order.userId))
+                                   .unique();
+
+        // Fetch item details (similar to getOrderWithDetails, maybe refactor later)
+        const itemsWithDetails = await Promise.all(
+            order.items.map(async (item) => {
+                const menuItem = await ctx.db.get(item.menuItemId);
+                return {
+                    _id: item.menuItemId,
+                    name: menuItem?.name ?? "Unknown Item",
+                    quantity: item.quantity,
+                    unitPrice: item.unitPrice, // Price at time of order
+                    totalPrice: item.unitPrice * item.quantity,
+                };
+            })
+        );
+
+        return {
+            _id: order._id,
+            _creationTime: order._creationTime,
+            status: order.status,
+            orderType: order.orderType,
+            totalAmount: order.totalAmount,
+            discountAmount: order.discountAmount,
+            // Add taxAmount if available in your schema
+            // taxAmount: order.taxAmount,
+            subTotal: order.items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0), // Calculate subtotal before discounts/taxes
+            items: itemsWithDetails,
+            branch: branch ? {
+                name: branch.name,
+                address: branch.address,
+                contactNumber: branch.contactNumber,
+            } : null,
+            user: orderUser ? {
+                name: orderUser.name ?? order.customerName ?? "N/A",
+                email: orderUser.email,
+                address: orderUser.address, // Include the address object
+            } : null,
+            deliveryAddress: order.deliveryAddress,
+            notes: order.notes,
+        };
+    },
+});

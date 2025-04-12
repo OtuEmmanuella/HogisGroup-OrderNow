@@ -3,13 +3,14 @@ import { NextResponse } from 'next/server';
 
 // Define routes that should be publicly accessible
 const isPublicRoute = createRouteMatcher([
-  '/',             // Homepage
+  // '/',             // Homepage - Keep this here for now, redirect handled below explicitly
   '/api/webhook(.*)',  // Any path starting with /api/webhook
   '/api/webhooks/clerk', // Clerk webhook endpoint specifically
   '/api/trpc(.*)', // tRPC API routes
   '/sign-in(.*)',  // Sign-in page and its subpaths
   '/sign-up(.*)',  // Sign-up page and its subpaths
   '/start-ordering(.*)', // Onboarding page and any subpaths
+  '/home(.*)' // Add the new home page as public
 ]);
 
 // Define routes that should be ignored by the middleware (if any)
@@ -18,7 +19,15 @@ const isPublicRoute = createRouteMatcher([
 // ]);
 
 export default clerkMiddleware(async (auth, req) => {
-  // Allow access to public routes defined above
+  const { pathname } = req.nextUrl;
+
+  // --- Force redirect to /start-ordering for the homepage ---
+  if (pathname === '/') {
+    const onboardingUrl = new URL('/start-ordering', req.url);
+    return NextResponse.redirect(onboardingUrl);
+  }
+
+  // Allow access to public routes defined above, including the new /home
   if (isPublicRoute(req)) {
     return NextResponse.next();
   }

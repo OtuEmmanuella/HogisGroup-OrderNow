@@ -9,8 +9,8 @@ export default function Page() {
   const redirectUrlParam = searchParams.get('redirect_url');
 
   // Use the redirect_url from params if available, otherwise default to fallback
-  // Fallback to '/' if the param is missing for some reason
-  const effectiveRedirectUrl = redirectUrlParam || "/"; 
+  // Fallback to '/home' if the param is missing for some reason
+  const effectiveRedirectUrl = redirectUrlParam || "/home"; 
 
   console.log("[SignIn Page] Redirect URL Param:", redirectUrlParam);
   console.log("[SignIn Page] Effective Redirect URL for component:", effectiveRedirectUrl);
@@ -20,7 +20,7 @@ export default function Page() {
         // Use forceRedirectUrl for higher priority
         forceRedirectUrl={effectiveRedirectUrl}
         // Keep fallback as an ultimate backup 
-        fallbackRedirectUrl="/" 
+        fallbackRedirectUrl="/home" 
        />
   );
 } 

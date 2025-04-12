@@ -17,10 +17,10 @@ function AdminSidebar() {
       <nav className="flex flex-col space-y-2">
         <h2 className="text-lg font-semibold mb-4">Admin Menu</h2>
         <Button variant="ghost" className="justify-start" asChild>
-          <Link href="/admin">Dashboard</Link>
+          <Link href="/(admin)/admin">Dashboard</Link>
         </Button>
         <Button variant="ghost" className="justify-start" asChild>
-          <Link href="/admin/branches">Branches</Link>
+          <Link href="/(admin)/branches">Branches</Link>
         </Button>
         <Button variant="ghost" className="justify-start" asChild>
           <Link href="/admin/menu">Menu Management</Link>
@@ -30,6 +30,9 @@ function AdminSidebar() {
         </Button>
         <Button variant="ghost" className="justify-start" asChild>
           <Link href="/admin/promotions">Promotions</Link>
+        </Button>
+        <Button variant="ghost" className="justify-start" asChild>
+          <Link href="/admin/insights">Insights</Link>
         </Button>
         {/* Add more links as needed */}
       </nav>
@@ -55,7 +58,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     // If loading is finished and user is not an admin, redirect
     if (!isLoading && !isAdmin) {
       console.warn('Admin access denied. Redirecting...');
-      router.replace('/');
+      router.replace('/home');
     }
   }, [isLoading, isAdmin, router]);
 
@@ -72,7 +75,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return (
       <div className="flex flex-col justify-center items-center h-screen">
         <p className="text-destructive mb-4">Access Denied</p>
-        <Link href="/">
+        <Link href="/home">
           <Button variant="link">Go to Homepage</Button>
         </Link>
       </div>

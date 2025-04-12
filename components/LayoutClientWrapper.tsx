@@ -6,7 +6,7 @@ import Header from "@/components/Header";
 import MobileCartBar from "@/components/MobileCartBar";
 import CartDrawer from "@/components/CartDrawer";
 import SyncUserWithConvex from "@/components/SyncUserWithConvex";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "sonner";
 
 export default function LayoutClientWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -22,7 +22,7 @@ export default function LayoutClientWrapper({ children }: { children: React.Reac
       {showHeader && <Header />}
       <SyncUserWithConvex />
       <main suppressHydrationWarning={true} className="flex-grow">{children}</main>
-      <Toaster />
+      <Toaster richColors position="top-right" />
       {showCartElements && (
         <div suppressHydrationWarning={true}>
           <MobileCartBar />

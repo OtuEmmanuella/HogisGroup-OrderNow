@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api";
 import { Doc, Id } from "./_generated/dataModel"; // Import Id and Doc
@@ -29,15 +29,13 @@ export const createCategory = mutation({
   args: {
     name: v.string(),
     description: v.optional(v.string()),
-    // Removed: branchId: v.id("branches"),
-    // Removed: location, eventDate, price, totalTickets, userId
+    displayOrder: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    await ensureAdmin(ctx); // <-- Add auth check
+    await ensureAdmin(ctx); // Ensure only admins can create
     const categoryId = await ctx.db.insert("menuCategories", {
-      name: args.name,
-      description: args.description,
-      // Removed: branchId: args.branchId,
+      ...args,
+      isActive: true, // Default new categories to active
     });
     return categoryId;
   },
@@ -119,18 +117,14 @@ export const updateMenuItemImage = mutation({
 export const updateCategory = mutation({
   args: {
     categoryId: v.id("menuCategories"),
-    name: v.string(),
+    name: v.optional(v.string()),
     description: v.optional(v.string()),
-    // branchId should not change typically, handled via creation
+    displayOrder: v.optional(v.number()),
+    isActive: v.optional(v.boolean()), // Allow updating isActive
   },
-  handler: async (ctx, { categoryId, name, description }) => {
-    await ensureAdmin(ctx); // <-- Add auth check
-    const existingCategory = await ctx.db.get(categoryId);
-    if (!existingCategory) {
-        throw new Error("Category not found");
-    }
-    // Removed: Validation logic tied to branchId needs rethinking if necessary
-    await ctx.db.patch(categoryId, { name, description });
+  handler: async (ctx, { categoryId, ...updates }) => {
+    await ensureAdmin(ctx);
+    await ctx.db.patch(categoryId, updates);
   },
 });
 
@@ -424,10 +418,10 @@ export const seedSampleMenu = mutation({
 
     // 1. Seed Global Categories
     const categoriesToSeed = [
-        { name: "Appetizers", description: "Start your meal with these delicious bites." },
-        { name: "Main Courses", description: "Hearty and satisfying main dishes." },
-        { name: "Desserts", description: "Sweet treats to end your meal." },
-        { name: "Drinks", description: "Refreshing beverages." },
+        { name: "Appetizers", description: "Start your meal with these delicious bites.", displayOrder: 1, isActive: true },
+        { name: "Main Courses", description: "Hearty and satisfying main dishes.", displayOrder: 2, isActive: true },
+        { name: "Desserts", description: "Sweet treats to end your meal.", displayOrder: 3, isActive: true },
+        { name: "Drinks", description: "Refreshing beverages.", displayOrder: 4, isActive: true },
     ];
     
     const categoryIds: { [key: string]: Id<"menuCategories"> } = {};
@@ -534,3 +528,21 @@ export const migrateMenuItemsAddBranchId = mutation({
 // calculateEventMetrics, getEventsByUser, getUserMetrics
 // Removed related imports: ConvexError, DURATIONS, WAITING_LIST_STATUS, TICKET_STATUS,
 // internal, processQueue, RateLimiter, MINUTE
+
+// Internal mutation for seeding
+export const seedMenuData = internalMutation(async (ctx) => {
+  // ... check if data exists ...
+  console.log("Seeding menu categories...");
+  const categoriesToSeed: Omit<Doc<"menuCategories">, "_id" | "_creationTime">[] = [
+    { name: "Appetizers", displayOrder: 1, isActive: true }, // Added isActive
+    { name: "Main Courses", displayOrder: 2, isActive: true }, // Added isActive
+    { name: "Desserts", displayOrder: 3, isActive: true }, // Added isActive
+    { name: "Drinks", displayOrder: 4, isActive: true }, // Added isActive
+  ];
+  const categoryIds: Record<string, Id<"menuCategories">> = {};
+  for (const category of categoriesToSeed) {
+    const id = await ctx.db.insert("menuCategories", category);
+    categoryIds[category.name] = id;
+  }
+  // ... seed menu items using categoryIds ...
+});

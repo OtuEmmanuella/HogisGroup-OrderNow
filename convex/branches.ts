@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { api } from "./_generated/api"; // Ensure api is imported if needed later
 import { Id, Doc } from "./_generated/dataModel";
@@ -26,18 +26,22 @@ export const getById = query({
 const branchArgs = {
   name: v.string(),
   address: v.string(),
+  contactNumber: v.string(),
   operatingHours: v.string(),
   supportedOrderTypes: v.array(
     v.union(v.literal("Delivery"), v.literal("Dine-In"), v.literal("Take-out"))
   ),
   deliveryZone: v.optional(v.any()), // Expecting GeoJSON structure
+  minimumOrderAmount: v.optional(v.number()),
+  deliveryFee: v.optional(v.number()),
+  isActive: v.boolean(),
 };
 
 // Mutation to create a new branch
 export const createBranch = mutation({
   args: branchArgs,
   handler: async (ctx, args) => {
-    await ensureAdmin(ctx); // <-- Add auth check
+    await ensureAdmin(ctx);
     const branchId = await ctx.db.insert("branches", args);
     return branchId;
   },
@@ -47,13 +51,8 @@ export const createBranch = mutation({
 export const updateBranch = mutation({
   args: { branchId: v.id("branches"), ...branchArgs },
   handler: async (ctx, { branchId, ...updates }) => {
-    await ensureAdmin(ctx); // <-- Add auth check
-    const existingBranch = await ctx.db.get(branchId);
-    if (!existingBranch) {
-      throw new Error("Branch not found");
-    }
+    await ensureAdmin(ctx);
     await ctx.db.patch(branchId, updates);
-    return branchId;
   },
 });
 
@@ -74,7 +73,7 @@ export const deleteBranch = mutation({
 
 // Define a type for the initial branch data matching insert requirements
 type InitialBranchData = Pick<Doc<"branches">, 
-    "name" | "address" | "operatingHours" | "supportedOrderTypes"
+    "name" | "address" | "operatingHours" | "supportedOrderTypes" | "contactNumber" | "isActive"
 >;
 
 // --- Seeding Mutation --- 
@@ -84,18 +83,24 @@ const initialBranches: InitialBranchData[] = [
     address: "7 Akim Cl, Housing Estate Rd, Calabar", 
     operatingHours: "Dine-In/Take-out: 24 Hours; Delivery: Daily until 9pm", 
     supportedOrderTypes: ["Delivery", "Dine-In", "Take-out"],
+    contactNumber: "+234-123-456-7890",
+    isActive: true
   },
   {
     name: "Hogis Royale & Apartment Branch",
     address: "State Housing Estate, 6 Bishop Moynagh Ave, Calabar", 
     operatingHours: "Dine-In/Take-out: 24 Hours; Delivery: Daily until 9pm",   
-    supportedOrderTypes: ["Delivery", "Take-out"], 
+    supportedOrderTypes: ["Delivery", "Take-out"],
+    contactNumber: "+234-123-456-7891",
+    isActive: true
   },
   {
     name: "Hogis Exclusive Suites Branch",
-    address: "E1 Estate Lemna Rd, Atekong, Calabar", // Adjusted slightly for clarity 
+    address: "E1 Estate Lemna Rd, Atekong, Calabar",
     operatingHours: "Dine-In/Take-out: 24 Hours",      
-    supportedOrderTypes: ["Dine-In", "Take-out"], 
+    supportedOrderTypes: ["Dine-In", "Take-out"],
+    contactNumber: "+234-123-456-7892",
+    isActive: true
   },
 ];
 
@@ -120,13 +125,21 @@ export const seedInitialBranches = mutation({
         branchesAdded++;
         console.log(`Added branch: ${branchData.name}`);
       } else {
-         console.log(`Branch already exists: ${branchData.name}. Checking hours and address...`);
+         console.log(`Branch already exists: ${branchData.name}. Checking details...`);
          let updates: Partial<InitialBranchData> = {};
+         
+         // Check all fields that should be updated
          if (existing.operatingHours !== branchData.operatingHours) {
            updates.operatingHours = branchData.operatingHours;
          }
          if (existing.address !== branchData.address) {
            updates.address = branchData.address;
+         }
+         if (!existing.contactNumber) {
+           updates.contactNumber = branchData.contactNumber;
+         }
+         if (existing.isActive === undefined) {
+           updates.isActive = branchData.isActive;
          }
          
          if (Object.keys(updates).length > 0) {
@@ -141,4 +154,71 @@ export const seedInitialBranches = mutation({
     return { branchesAdded };
   },
 });
-// --- End Seeding --- 
+// --- End Seeding ---
+
+export const getBranchSalesAnalytics = query({
+  args: {},
+  handler: async (ctx) => {
+    // Fetch all branches
+    const branches = await ctx.db.query("branches").collect();
+
+    // Fetch all orders
+    const orders = await ctx.db.query("orders").collect();
+
+    // Calculate sales per branch
+    const branchSales = branches.map((branch) => {
+      const branchOrders = orders.filter((order) => order.branchId === branch._id);
+      const totalSales = branchOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+      return {
+        branchId: branch._id,
+        branchName: branch.name,
+        totalSales: totalSales / 100, // Convert from kobo/cents to Naira/Dollars
+      };
+    });
+
+    return branchSales;
+  },
+});
+
+// Internal mutation to seed initial data (if needed)
+export const seedInitialData = internalMutation(
+    async (ctx: MutationCtx) => {
+        // Check if data already exists to prevent re-seeding
+        const existingBranches = await ctx.db.query("branches").collect();
+        if (existingBranches.length > 0) {
+            console.log("Branch data already seeded.");
+            return;
+        }
+
+        console.log("Seeding initial branch data...");
+        const initialBranches: Omit<Doc<"branches">, "_id" | "_creationTime">[] = [
+            {
+                name: "Hogis Main",
+                address: "123 Hogis Way, Calabar",
+                contactNumber: "+2348000000001",
+                operatingHours: "9:00 AM - 10:00 PM Daily",
+                supportedOrderTypes: ["Delivery", "Dine-In", "Take-out"],
+                isActive: true,
+                minimumOrderAmount: 150000,
+                deliveryFee: 50000,
+                deliveryZone: {},
+            },
+            {
+                name: "Hogis Express",
+                address: "456 Express Ln, Calabar",
+                contactNumber: "+2348000000002",
+                operatingHours: "10:00 AM - 8:00 PM Mon-Sat",
+                supportedOrderTypes: ["Take-out"],
+                isActive: true,
+                minimumOrderAmount: 100000,
+                deliveryFee: undefined,
+                deliveryZone: undefined,
+            },
+        ];
+
+        for (const branchData of initialBranches) {
+            await ctx.db.insert("branches", branchData);
+        }
+        console.log(`Seeded ${initialBranches.length} branches.`);
+    }
+);

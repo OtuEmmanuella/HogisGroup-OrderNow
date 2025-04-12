@@ -1,5 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { mutation, query, internalQuery, internalMutation } from "./_generated/server";
+import { getUserFromAuth } from "./lib/auth"; // Import getUserFromAuth
+import { api, internal } from "./_generated/api"; // Import internal
 
 export const getUsersPaystackSubaccountId = query({
   args: { userId: v.string() },
@@ -52,10 +54,11 @@ export const updateUser = mutation({
     }
 
     // Create new user
-    const newUserId = await ctx.db.insert("users", {
+    const newUserId = await ctx.db.insert("users", { // <-- Check this insert
       userId,
       name,
       email,
+      credits: 0,
       paystackSubaccountId: undefined,
     });
 
@@ -75,15 +78,89 @@ export const getUserById = query({
   },
 });
 
+// Get user by Clerk ID (internal helper, used by webhook)
+export const getUserByClerkIdInternal = internalQuery({
+    args: { userId: v.string() },
+    handler: async (ctx, { userId }) => {
+        return await ctx.db
+            .query("users")
+            .withIndex("by_user_id", (q) => q.eq("userId", userId))
+            .unique();
+    },
+});
+
+// Create user (internal helper, used by webhook)
+export const createUserInternal = internalMutation({
+    args: {
+        userId: v.string(),
+        email: v.string(),
+        name: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+        role: v.optional(v.union(v.literal("admin"), v.literal("customer"))),
+    },
+    handler: async (ctx, { userId, email, name, imageUrl, role }) => {
+        await ctx.db.insert("users", {
+            userId,
+            email,
+            name: name ?? "",
+            imageUrl,
+            credits: 0,
+            role: role ?? "customer",
+        });
+    },
+});
+
+// Update user (internal helper, used by webhook)
+export const updateUserInternal = internalMutation({
+    args: {
+        userId: v.string(),
+        email: v.optional(v.string()),
+        name: v.optional(v.string()),
+        imageUrl: v.optional(v.string()),
+    },
+    handler: async (ctx, { userId, ...updates }) => {
+        const user = await ctx.runQuery(internal.users.getUserByClerkIdInternal, { userId });
+        if (!user) {
+            throw new Error("User not found, cannot update");
+        }
+        await ctx.db.patch(user._id, updates);
+    },
+});
+
+// Delete user (internal helper, used by webhook)
+export const deleteUserInternal = internalMutation({
+    args: { userId: v.string() },
+    handler: async (ctx, { userId }) => {
+        const user = await ctx.runQuery(internal.users.getUserByClerkIdInternal, { userId });
+        if (!user) {
+            console.warn("User not found for deletion, skipping.");
+            return; // Or throw error if deletion must succeed
+        }
+        await ctx.db.delete(user._id);
+    },
+});
+
+// Public query to get current user's data (if authenticated)
+export const getCurrentUser = query({
+    args: {},
+    handler: async (ctx) => {
+         return await getUserFromAuth(ctx); // Reuse auth helper
+    },
+});
+
+// --- Potentially remove or secure this if not needed ---
+// Get user by Clerk ID (public, might expose internal details)
+// Consider if this needs to be public or if getCurrentUser is sufficient
 export const getUserByClerkId = query({
-  args: { userId: v.string() },
-  handler: async (ctx, { userId }) => {
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user_id", (q) => q.eq("userId", userId))
-      .first();
-    return user; // Returns the whole user object, including the role
-  },
+    args: { userId: v.string() },
+    handler: async (ctx, { userId }) => {
+        // Add auth check? Or make internal?
+        const user = await ctx.db
+            .query("users")
+            .withIndex("by_user_id", (q) => q.eq("userId", userId))
+            .unique();
+        return user;
+    },
 });
 
 // Function to ensure user exists in Convex, creating or updating as needed
@@ -108,8 +185,25 @@ export const syncUser = mutation({
         userId: clerkUserId,
         name: name,
         email: email,
-        role: "customer", // Default new users to 'customer'
+        credits: 0,
+        role: "customer",
       });
     }
+  },
+});
+
+export const getActiveUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    // Define a threshold for considering a user "active" (e.g., last 30 minutes)
+    const activeThreshold = now - (30 * 60 * 1000); // 30 minutes ago
+
+    const activeUsers = await ctx.db
+      .query("userActivity")
+      .filter((q) => q.gte(q.field("lastActive"), activeThreshold))
+      .collect();
+
+    return activeUsers;
   },
 });

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react'; // Import useMutation
 import { api } from '@/convex/_generated/api';
 import { Doc, Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,8 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react'; // Import Loader2
+import { toast } from 'sonner'; // Import toast
 
 import { PromoBanner } from "./PromoBanner";
 
@@ -29,9 +30,10 @@ interface MenuItemCardProps {
     isAvailable?: boolean;
   };
   onAddToCart: (item: { _id: Id<"menuItems">; name: string; price: number }) => void;
+  isAddingToCart: boolean; // Add prop to indicate loading state
 }
 
-export function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
+export function MenuItemCard({ item, onAddToCart, isAddingToCart }: MenuItemCardProps) {
   const displayPrice = item.price ? (item.price / 100).toFixed(2) : 'N/A';
   const imageUrl = item.imageUrl;
 
@@ -42,13 +44,13 @@ export function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
     )}>
       <div className="relative w-full aspect-[4/3] bg-secondary">
         {imageUrl ? (
-          <Image 
-            src={imageUrl} 
-            alt={item.name} 
+          <Image
+            src={imageUrl}
+            alt={item.name}
             fill
             className="object-cover"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
-            onError={(e) => { 
+            onError={(e) => {
               (e.target as HTMLImageElement).onerror = null;
               (e.target as HTMLImageElement).src = '/images/placeholder-image.svg';
             }}
@@ -60,7 +62,7 @@ export function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
           </div>
         )}
       </div>
-      
+
       <div className="p-3 flex flex-col flex-grow">
         <CardHeader className="p-0 mb-1">
           <CardTitle className="text-sm font-semibold line-clamp-1">{item.name}</CardTitle>
@@ -72,13 +74,14 @@ export function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
         </CardContent>
         <CardFooter className="p-0 flex flex-col items-start mt-auto">
           <p className="font-bold text-sm mb-2">₦{displayPrice}</p>
-          <Button 
+          <Button
             size="sm"
             className="w-full text-xs"
             onClick={() => onAddToCart({_id: item._id, name: item.name, price: item.price})}
-            disabled={!item.isAvailable}
+            disabled={!item.isAvailable || isAddingToCart} // Disable if unavailable or adding
           >
-            {item.isAvailable ? 'Add to Cart' : 'Unavailable'}
+            {isAddingToCart ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {item.isAvailable ? (isAddingToCart ? 'Adding...' : 'Add to Cart') : 'Unavailable'}
           </Button>
         </CardFooter>
       </div>
@@ -86,10 +89,11 @@ export function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) {
   );
 }
 
-function MenuCategorySection({ categoryId, categoryName, onAddToCart }: {
+function MenuCategorySection({ categoryId, categoryName, onAddToCart, isAddingToCart }: {
   categoryId: Id<'menuCategories'>;
   categoryName: string;
   onAddToCart: (item: { _id: Id<"menuItems">; name: string; price: number }) => void;
+  isAddingToCart: (itemId: Id<"menuItems">) => boolean; // Function to check loading state
 }) {
   const items = useQuery(api.menu.getMenuItems, { categoryId, includeUnavailable: false });
   const [isExpanded, setIsExpanded] = useState(false);
@@ -137,7 +141,11 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart }: {
               <div className="flex space-x-3">
                 {itemsToDisplay.map((item) => (
                   <div key={item._id} className="w-40 flex-shrink-0">
-                      <MenuItemCard item={item} onAddToCart={onAddToCart} />
+                      <MenuItemCard
+                        item={item}
+                        onAddToCart={onAddToCart}
+                        isAddingToCart={isAddingToCart(item._id)} // Pass loading state
+                      />
                   </div>
                 ))}
               </div>
@@ -146,7 +154,12 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart }: {
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
               {items.map((item) => (
-                <MenuItemCard key={item._id} item={item} onAddToCart={onAddToCart} />
+                <MenuItemCard
+                  key={item._id}
+                  item={item}
+                  onAddToCart={onAddToCart}
+                  isAddingToCart={isAddingToCart(item._id)} // Pass loading state
+                />
               ))}
             </div>
           )}
@@ -155,7 +168,7 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart }: {
 
       {showExpandButton && (
         <div className="mt-3 text-center">
-          <Button 
+          <Button
             variant="outline"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
@@ -179,30 +192,55 @@ interface MenuDisplayProps {
 
 export default function MenuDisplay({ selectedCategoryId }: MenuDisplayProps) {
   const categories = useQuery(api.menu.getAllCategories);
-  const { addToCart } = useOrderContext();
-  // const isMobile = useMediaQuery('(max-width: 767px)');
-
+  const { addToCart, activeSharedCartId } = useOrderContext(); // Get activeSharedCartId
+  const addSharedItem = useMutation(api.sharedCarts.addSharedCartItem); // Hook for shared cart mutation
+  const [addingItemId, setAddingItemId] = useState<Id<"menuItems"> | null>(null); // State to track which item is being added
 
   // Fetch in-menu banners
   const inMenuBanners = useQuery(api.promotions.getActiveInMenuBanners);
   const isLoadingBanners = inMenuBanners === undefined;
 
-  const handleAddToCart = (item: { _id: Id<"menuItems">; name: string; price: number }) => {
-    addToCart({
-      _id: item._id,
-      name: item.name,
-      price: item.price
-    });
+  const handleAddToCart = async (item: { _id: Id<"menuItems">; name: string; price: number }) => {
+    setAddingItemId(item._id); // Set loading state for this item
+    try {
+      if (activeSharedCartId) {
+        // If in a shared cart, add to the shared cart via mutation
+        await addSharedItem({
+          cartId: activeSharedCartId,
+          menuItemId: item._id,
+          quantity: 1, // Assuming adding 1 at a time for now
+          // unitPrice is handled server-side in the mutation
+        });
+        toast.success(`${item.name} added to group order.`);
+      } else {
+        // Otherwise, add to the regular local cart using context
+        addToCart({
+          _id: item._id,
+          name: item.name,
+          price: item.price
+        });
+        // Add success toast for regular cart addition
+        toast.success(`${item.name} added to cart.`);
+      }
+    } catch (error) {
+        console.error("Failed to add item:", error);
+        toast.error(`Failed to add ${item.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+        setAddingItemId(null); // Reset loading state
+    }
   };
 
   const activeCategories = useMemo(() => {
     if (!categories) return [];
-    return selectedCategoryId 
+    return selectedCategoryId
       ? categories.filter((c: Doc<"menuCategories">) => c._id === selectedCategoryId)
       : categories;
   }, [categories, selectedCategoryId]);
 
   const showInMenuBanner = !isLoadingBanners && inMenuBanners && inMenuBanners.length > 0;
+
+  // Function to check if a specific item is being added
+  const isAddingToCart = (itemId: Id<"menuItems">) => addingItemId === itemId;
 
   if (categories === undefined) {
     return <Skeleton className="h-64 w-full" />;
@@ -226,13 +264,14 @@ export default function MenuDisplay({ selectedCategoryId }: MenuDisplayProps) {
           <h2 id={`category-title-${category._id}`} className="text-xl md:text-2xl font-semibold mb-4">
             {category.name}
           </h2>
-          <MenuCategorySection 
+          <MenuCategorySection
             categoryId={category._id}
             categoryName={category.name}
-            onAddToCart={handleAddToCart} 
+            onAddToCart={handleAddToCart}
+            isAddingToCart={isAddingToCart} // Pass loading check function
           />
         </section>
       ))}
     </div>
   );
-} 
+}

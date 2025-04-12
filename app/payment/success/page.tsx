@@ -41,11 +41,14 @@ export default function PaymentSuccessPage() {
       </Link>
             </Button>
           )}
-          <Button variant="outline" asChild className="w-full">
-      <Link href="/">
-              Place Another Order
-      </Link>
-          </Button>
+          <div className="mt-8 flex flex-col sm:flex-row justify-center gap-4">
+            <Link href="/home">
+              <Button variant="outline" size="lg">Back to Home</Button>
+            </Link>
+            <Link href="/orders">
+              <Button variant="outline" size="lg">View Orders</Button>
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </div>

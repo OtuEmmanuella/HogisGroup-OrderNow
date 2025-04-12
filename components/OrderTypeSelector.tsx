@@ -11,6 +11,7 @@ interface OrderTypeSelectorProps {
   // TODO: Add supportedTypes: OrderType[] based on selected branch later
   selectedType: OrderType | null;
   onSelectType: (type: OrderType) => void;
+  isCreatingCart?: boolean;
 }
 
 const orderTypes: { type: OrderType; label: string; description: string }[] = [
@@ -34,6 +35,7 @@ const orderTypes: { type: OrderType; label: string; description: string }[] = [
 export default function OrderTypeSelector({
   selectedType,
   onSelectType,
+  isCreatingCart,
 }: OrderTypeSelectorProps) {
   // TODO: Filter orderTypes based on supportedTypes from the selected branch
 
@@ -48,9 +50,9 @@ export default function OrderTypeSelector({
             <Button
               key={type}
               variant={selectedType === type ? 'default' : 'outline'}
-              className="h-auto py-4 flex flex-col items-start text-left" // Changed alignment
+              className="h-auto py-4 flex flex-col items-start text-left"
               onClick={() => onSelectType(type)}
-              // TODO: Add disabled state based on supportedTypes
+              disabled={isCreatingCart}
             >
               <span className="font-semibold mb-1">{label}</span>
               <span className="text-sm text-muted-foreground font-normal">

@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useOrderContext } from '@/context/OrderContext';
-import { useQuery, useMutation, useAction } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
+import { useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -77,6 +78,7 @@ export default function CheckoutPage() {
     cartItems,
     cartTotal,
     resetOrderFlow,
+    activeSharedCartId
   } = useOrderContext();
 
   const [deliveryAddress, setDeliveryAddress] = useState<AddressFormData | null>(null);
@@ -97,6 +99,7 @@ export default function CheckoutPage() {
 
   const createOrder = useMutation(api.orders.createOrder);
   const initializePaystack = useAction(api.paystack.initializeTransaction);
+  const initializeSharedCartPayment = useAction(api.paystack.initializeSharedCartTransaction);
 
   const validationResult = useQuery(
     api.promotions.validatePromoCode,
@@ -151,7 +154,7 @@ export default function CheckoutPage() {
   // Fix for Issue 2: Move useEffect to the top level
   useEffect(() => {
     if (isOrderContextMissing) {
-      router.replace('/');
+      router.replace('/home');
     }
   }, [isOrderContextMissing, router]);
 
@@ -173,7 +176,7 @@ export default function CheckoutPage() {
       toast({
         title: 'User Error',
         description: 'Could not find user email for payment.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       return;
     }
@@ -183,26 +186,26 @@ export default function CheckoutPage() {
     try {
       const completeDeliveryAddress = requiresAddress && deliveryAddress
         ? {
-            street: deliveryAddress.street,
-            customerPhone: deliveryAddress.customerPhone,
-            recipientName: deliveryAddress.isOrderingForSomeoneElse
-              ? deliveryAddress.recipientName
-              : undefined,
-            recipientPhone: deliveryAddress.isOrderingForSomeoneElse
-              ? deliveryAddress.recipientPhone
-              : undefined,
-          }
+          street: deliveryAddress.street,
+          customerPhone: deliveryAddress.customerPhone,
+          recipientName: deliveryAddress.isOrderingForSomeoneElse
+            ? deliveryAddress.recipientName
+            : undefined,
+          recipientPhone: deliveryAddress.isOrderingForSomeoneElse
+            ? deliveryAddress.recipientPhone
+            : undefined,
+        }
         : undefined;
 
       const dineInDetails = requiresDineInDetails && dineInDateTime
         ? {
-            dineInDateTime: combineDateAndTime(
-              dineInDateTime,
-              dineInTime
-            ).getTime(),
-            dineInGuests: parseInt(dineInGuests, 10),
-            dineInReservationType,
-          }
+          dineInDateTime: combineDateAndTime(
+            dineInDateTime,
+            dineInTime
+          ).getTime(),
+          dineInGuests: parseInt(dineInGuests, 10),
+          dineInReservationType,
+        }
         : {};
 
       // Ensure selectedOrderType is one of the allowed values before assigning
@@ -237,11 +240,25 @@ export default function CheckoutPage() {
         description: 'Redirecting to payment gateway...',
       });
 
-      const paymentUrl = await initializePaystack({
-        orderId, // Assuming orderId is Id<'orders'> from createOrder
-        email: user.primaryEmailAddress.emailAddress,
-        amountKobo: finalTotalKobo,
-      });
+      let paymentUrl: string | undefined;
+      if (activeSharedCartId) {
+        // Assuming you have access to the cartId in this component
+        // and the userId of the current user
+        const cartId = activeSharedCartId;
+        const userId = user.id; // Assuming user.id is the Clerk user ID
+        paymentUrl = await initializeSharedCartPayment({
+          cartId: cartId as Id<"sharedCarts">,
+          userId: userId,
+          email: user.primaryEmailAddress.emailAddress,
+          amountKobo: finalTotalKobo,
+        });
+      } else {
+        paymentUrl = await initializePaystack({
+          orderId, // Assuming orderId is Id<'orders'> from createOrder
+          email: user.primaryEmailAddress.emailAddress,
+          amountKobo: finalTotalKobo,
+        });
+      }
 
       if (paymentUrl) {
         resetOrderFlow();
@@ -255,7 +272,7 @@ export default function CheckoutPage() {
         title: 'Checkout Failed',
         description:
           error instanceof Error ? error.message : 'An unexpected error occurred.',
-        variant: 'destructive',
+        variant: 'destructive'
       });
       setIsSubmitting(false);
     }
@@ -288,7 +305,7 @@ export default function CheckoutPage() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">Home</BreadcrumbLink>
+              <BreadcrumbLink href="/home">Home</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <Slash className="h-4 w-4" />
@@ -485,8 +502,8 @@ export default function CheckoutPage() {
                 {selectedOrderType === 'Delivery'
                   ? 'Delivery Address'
                   : selectedOrderType === 'Take-out'
-                  ? 'Pickup Details'
-                  : 'Dine-In Details'}
+                    ? 'Pickup Details'
+                    : 'Dine-In Details'}
               </h3>
               <Separator />
               {selectedOrderType === 'Delivery' && (
@@ -604,4 +621,11 @@ export default function CheckoutPage() {
       </div>
     </div>
   );
+}
+
+function combineDateAndTime(date: Date, time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number);
+  const newDate = new Date(date);
+  newDate.setHours(hours, minutes, 0, 0);
+  return newDate;
 }

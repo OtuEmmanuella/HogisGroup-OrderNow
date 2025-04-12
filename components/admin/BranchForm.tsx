@@ -24,6 +24,7 @@ import { Id } from '@/convex/_generated/dataModel';
 const branchFormSchema = z.object({
   name: z.string().min(3, { message: "Branch name must be at least 3 characters." }),
   address: z.string().min(5, { message: "Address must be at least 5 characters." }),
+  contactNumber: z.string().min(5, { message: "Contact number must be at least 5 characters." }),
   operatingHours: z.string().min(5, { message: "Operating hours must be specified." }), // Example: "Mon-Fri 9am-10pm, Sat-Sun 11am-11pm"
   supportedOrderTypes: z.array(z.enum(["Delivery", "Dine-In", "Take-out"])).min(1, {
     message: "At least one order type must be supported.",
@@ -39,6 +40,7 @@ const branchFormSchema = z.object({
       return false;
     }
   }, { message: "Delivery zone must be valid GeoJSON (or empty)." }),
+  isActive: z.boolean().default(true),
 });
 
 export type BranchFormData = z.infer<typeof branchFormSchema>;
@@ -70,17 +72,17 @@ export default function BranchForm({
     defaultValues: defaultValues || {
       name: '',
       address: '',
+      contactNumber: '',
       operatingHours: '',
       supportedOrderTypes: [],
       deliveryZone: '',
+      isActive: true,
     },
   });
 
   async function handleFormSubmit(values: BranchFormData) {
     console.log("Branch form submitted:", values);
     await onSubmit(values); 
-    // Optionally reset form after successful submission? Depends on parent component logic
-    // form.reset(); 
   }
 
   return (
@@ -94,6 +96,19 @@ export default function BranchForm({
               <FormLabel>Branch Name</FormLabel>
               <FormControl>
                 <Input placeholder="Hogis Luxury Suites" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="contactNumber"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Contact Number</FormLabel>
+              <FormControl>
+                <Input placeholder="+234-123-456-7890" type="tel" {...field} />
               </FormControl>
               <FormMessage />
             </FormItem>
@@ -194,7 +209,6 @@ export default function BranchForm({
 }'
                   className="min-h-[150px] font-mono text-sm"
                   {...field}
-                  // Handle potential null/undefined from defaultValues
                   value={field.value ?? ''} 
                 />
               </FormControl>
@@ -203,6 +217,27 @@ export default function BranchForm({
                 Use tools like geojson.io to create one.
               </FormDescription>
               <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="isActive"
+          render={({ field }) => (
+            <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+              <FormControl>
+                <Checkbox
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              </FormControl>
+              <div className="space-y-1 leading-none">
+                <FormLabel>Active Branch</FormLabel>
+                <FormDescription>
+                  Only active branches will be shown to customers and accept orders.
+                </FormDescription>
+              </div>
             </FormItem>
           )}
         />

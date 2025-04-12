@@ -1,4 +1,6 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useUser } from "@clerk/nextjs";
+import { useMutation } from "convex/react";
 import { Id } from '@/convex/_generated/dataModel';
 
 export interface CartItem {
@@ -20,7 +22,11 @@ export interface UseShoppingCartReturn {
 
 const CART_STORAGE_KEY = 'hogis_cart';
 
+import { api } from '@/convex/_generated/api';
+
 export function useShoppingCart(): UseShoppingCartReturn {
+  const { user } = useUser();
+  const updateUserActivity = useMutation(api.actions.updateUserActivity);
   // Initialize state from localStorage or default to empty array
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
     if (typeof window === 'undefined') {
@@ -48,6 +54,7 @@ export function useShoppingCart(): UseShoppingCartReturn {
 
   const addToCart = useCallback(
     (itemToAdd: { _id: Id<'menuItems'>; name: string; price: number }) => {
+      // Call updateUserActivity mutation
       setCartItems((prevItems) => {
         const existingItem = prevItems.find((item) => item._id === itemToAdd._id);
         if (existingItem) {
@@ -62,8 +69,9 @@ export function useShoppingCart(): UseShoppingCartReturn {
           return [...prevItems, { ...itemToAdd, quantity: 1 }];
         }
       });
+      user && updateUserActivity({ userId: user.id }); // Replace 'user-id' with actual user ID
     },
-    []
+    [updateUserActivity, user]
   );
 
   const decrementItem = useCallback((itemId: Id<'menuItems'>) => {
@@ -81,17 +89,20 @@ export function useShoppingCart(): UseShoppingCartReturn {
         );
       }
     });
-  }, []);
+    user && updateUserActivity({ userId: user.id });
+  }, [updateUserActivity, user]);
 
   // Function to completely remove an item regardless of quantity
   const removeFromCart = useCallback((itemId: Id<'menuItems'>) => {
     setCartItems((prevItems) => prevItems.filter((item) => item._id !== itemId));
-  }, []);
+    user && updateUserActivity({ userId: user.id });
+  }, [updateUserActivity, user]);
 
 
   const clearCart = useCallback(() => {
     setCartItems([]);
-  }, []);
+    user && updateUserActivity({ userId: user.id });
+  }, [updateUserActivity, user]);
 
   const cartTotal = useMemo(() => {
     return cartItems.reduce((total, item) => total + item.price * item.quantity, 0);

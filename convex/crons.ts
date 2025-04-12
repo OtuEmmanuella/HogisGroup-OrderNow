@@ -12,7 +12,15 @@ crons.interval(
 );
 */
 
-// If no other crons are defined, this file might become empty 
+// Schedule the shared cart expiration job to run every hour
+crons.interval(
+  "expire-old-shared-carts",
+  { hours: 1 }, // Run every hour
+  internal.sharedCarts.expireOldSharedCarts // Reference the internal mutation we created
+);
+
+
+// If no other crons are defined, this file might become empty
 // except for the imports and export. That's okay.
 
 export default crons;
