@@ -31,11 +31,10 @@ export default function StartOrderingPage() {
     return 'welcome';
   });
   const [selectedBranch, setSelectedBranch] = useState<Id<'branches'> | null>(null);
-  const [selectedOrderTypeForCart, setSelectedOrderTypeForCart] = useState<OrderType | null>(null);
   const [selectedPaymentMode, setSelectedPaymentMode] = useState<PaymentMode>('split');
-  const [inviteCodeInput, setInviteCodeInput] = useState(''); // State for invite code input
+  const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [isCreatingCart, setIsCreatingCart] = useState(false);
-  const [isJoiningCart, setIsJoiningCart] = useState(false); // Loading state for joining
+  const [isJoiningCart, setIsJoiningCart] = useState(false);
   const { setSelectedBranchId: setGlobalBranchId, setSelectedOrderType: setGlobalOrderType } = useOrderContext();
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();

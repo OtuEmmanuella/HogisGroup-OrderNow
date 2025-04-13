@@ -20,6 +20,20 @@ import { Checkbox } from "@/components/ui/checkbox"; // For supported types
 import { OrderType } from '@/components/OrderTypeSelector'; // Import OrderType
 import { Id } from '@/convex/_generated/dataModel';
 
+// GeoJSON types
+type GeoJSONPolygon = {
+  type: 'Polygon';
+  coordinates: number[][][];
+};
+
+type GeoJSONMultiPolygon = {
+  type: 'MultiPolygon';
+  coordinates: number[][][][];
+};
+
+// Allow empty object for deliveryZone
+type DeliveryZone = GeoJSONPolygon | GeoJSONMultiPolygon | Record<string, never>;
+
 // Zod schema for form validation - should match convex/branches.ts args
 const branchFormSchema = z.object({
   name: z.string().min(3, { message: "Branch name must be at least 3 characters." }),
@@ -32,23 +46,31 @@ const branchFormSchema = z.object({
   deliveryZone: z.string().optional().refine(val => {
     if (!val || val.trim() === '') return true; // Allow empty
     try {
-      JSON.parse(val); // Basic JSON validation
-      // TODO: Add more specific GeoJSON polygon validation if needed
-      return true;
+      const parsed = JSON.parse(val);
+      return parsed.type === 'Polygon' || parsed.type === 'MultiPolygon';
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     } catch (_) { // Using underscore and disabling eslint rule
       return false;
     }
-  }, { message: "Delivery zone must be valid GeoJSON (or empty)." }),
+  }, { message: "Delivery zone must be valid GeoJSON Polygon or MultiPolygon (or empty)." }),
   isActive: z.boolean().default(true),
 });
 
 export type BranchFormData = z.infer<typeof branchFormSchema>;
 
-// Define the full branch type including _id and _creationTime from Convex query results
-export type Branch = BranchFormData & {
+// Update Branch type to match Convex schema
+export type Branch = {
   _id: Id<"branches">;
   _creationTime: number;
+  name: string;
+  address: string;
+  operatingHours: string;
+  supportedOrderTypes: ("Delivery" | "Dine-In" | "Take-out")[];
+  contactNumber?: string;
+  isActive?: boolean;
+  deliveryZone?: DeliveryZone;
+  minimumOrderAmount?: number;
+  deliveryFee?: number;
 };
 
 interface BranchFormProps {

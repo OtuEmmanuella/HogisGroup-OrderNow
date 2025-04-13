@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
+import Image from 'next/image'
 
 const CTASection = () => {
   return (
@@ -14,10 +15,13 @@ const CTASection = () => {
         viewport={{ once: true }}
         transition={{ duration: 1.2 }}
       >
-        <img 
+        <Image 
           src="https://images.unsplash.com/photo-1596436889106-be35e843f974?q=80&w=2070&auto=format&fit=crop" 
-          alt="Luxury Experience" 
+          alt="Luxury Experience"
+          width={2070}
+          height={1380}
           className="w-full h-full object-cover"
+          priority
         />
         <div className="absolute inset-0 bg-gradient-to-r from-black/90 to-black/70"></div>
       </motion.div>

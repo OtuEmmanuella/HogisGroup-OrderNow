@@ -11,6 +11,10 @@ const nextConfig = {
     pagesBufferLength: 5,
   },
   
+  experimental: {
+    serverActions: true,
+  },
+
   // Your existing config options here...
   webpack: (config, { isServer }) => {
     // Fix for 'electron' module not found error from dependencies like 'got'
@@ -52,9 +56,17 @@ const nextConfig = {
         // port: '', // Optional
         // pathname: '/**', // Optional: Allow any path, or be more specific if desired
       },
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'unsplash.com',
+      },
       // Add other domains if needed
     ],
   },
 };
 
-export default nextConfig; 
+export default nextConfig;

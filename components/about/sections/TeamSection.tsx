@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from "framer-motion"
 import { Linkedin, Twitter } from 'lucide-react'
+import Image from 'next/image'
 
 // Team members data
 const teamMembers = [
@@ -42,7 +43,7 @@ interface TeamSectionProps {
 
 const TeamSection = ({ isVisible }: TeamSectionProps) => {
   return (
-    <section className="hotel-section bg-hotel-navy py-20 md:py-32">
+    <section className="hotel-section bg-gradient-to-b from-hotel-dark to-hotel-navy py-20 md:py-32">
       <div className="container mx-auto px-4">
         <motion.div 
           className="text-center mb-16"
@@ -54,7 +55,7 @@ const TeamSection = ({ isVisible }: TeamSectionProps) => {
           <div className="h-0.5 w-16 bg-hotel-gold mx-auto mb-6"></div>
           <h2 className="text-3xl md:text-5xl font-serif mb-4">Leadership Excellence</h2>
           <p className="text-lg text-white/70 max-w-2xl mx-auto">
-            Meet the visionaries behind Hogis Group's continuing success and innovation
+            Meet the visionaries behind Hogis Group&apos;s continuing success and innovation
           </p>
         </motion.div>
         
@@ -64,14 +65,16 @@ const TeamSection = ({ isVisible }: TeamSectionProps) => {
               key={member.name}
               className="hotel-card bg-hotel-dark text-white group"
               initial={{ opacity: 0, y: 20 }}
-              animate={isVisible ? { opacity: 1, y: 0 } : {}}
+              animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ duration: 0.6, delay: index * 0.1 }}
               whileHover={{ y: -10 }}
             >
               <div className="relative overflow-hidden h-80">
-                <img 
+                <Image 
                   src={member.image} 
-                  alt={member.name} 
+                  alt={member.name}
+                  width={2070}
+                  height={1380}
                   className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end">

@@ -11,14 +11,13 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Skeleton } from "@/components/ui/skeleton"
 import {
-Table,
-TableBody,
-TableCaption,
-TableCell,
-TableFooter,
-TableHead,
-TableHeader,
-TableRow,
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@/components/ui/table"
 
 export default function AdminInsights() {

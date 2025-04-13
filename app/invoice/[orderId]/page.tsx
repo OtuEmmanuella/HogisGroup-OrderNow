@@ -56,25 +56,13 @@ export default function InvoicePage() {
     }
 
     const { 
-        _id, _creationTime, status, orderType, totalAmount, discountAmount, subTotal,
+        _id, _creationTime, orderType, totalAmount, discountAmount, subTotal,
         items, branch, user, deliveryAddress, notes 
     } = invoiceData;
 
-    // Calculate VAT (assuming totalAmount *includes* VAT if already calculated backend)
-    // If totalAmount does NOT include VAT, calculate it based on subTotal - discount
-    // Let's assume totalAmount *already* includes VAT based on typical order flows.
-    // We can derive the pre-VAT total for display if needed:
-    // const totalBeforeVAT = totalAmount / (1 + VAT_RATE);
-    // const calculatedVAT = totalAmount - totalBeforeVAT;
-    // OR If totalAmount *excludes* VAT:
-    const subTotalAfterDiscount = subTotal - (discountAmount ?? 0);
-    const calculatedVAT = subTotalAfterDiscount * VAT_RATE;
-    const finalTotal = subTotalAfterDiscount + calculatedVAT; // Recalculate total if needed
-
-    // Use pre-calculated totalAmount if it includes VAT, otherwise use finalTotal
+    // Use pre-calculated totalAmount and derive VAT from it
     const displayTotal = totalAmount; 
-    // const displayVAT = calculatedVAT; // Use this if calculating VAT here
-    const displayVAT = (totalAmount / (1 + VAT_RATE)) * VAT_RATE; // Derive VAT from total
+    const displayVAT = (totalAmount / (1 + VAT_RATE)) * VAT_RATE;
 
     return (
         <div className="max-w-4xl mx-auto p-4 sm:p-8 bg-white print:p-0">

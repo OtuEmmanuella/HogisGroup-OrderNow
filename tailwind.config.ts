@@ -66,6 +66,15 @@ export default {
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
   		},
+		  hotel: {
+			gold: '#C5B358',
+			dark: '#1A1F2C',
+			light: '#F1F0FB',
+			beige: '#F2EFE6',
+			cream: '#F9F7F0',
+			charcoal: '#333333',
+			navy: '#141E30'
+		},
   		keyframes: {
   			'accordion-down': {
   				from: {

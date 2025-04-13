@@ -2,25 +2,19 @@
 
 import React from 'react';
 import { useQuery } from 'convex/react';
+import { useUser } from '@clerk/nextjs'; // Adjust the import path based on your project setup
 import { api } from '@/convex/_generated/api';
-import { useUser } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { ensureAdmin } from '@/convex/lib/auth';
 
-export default function AdminPage() {
+export default function AdminDashboard() {
   const router = useRouter();
-  const { user, isLoaded } = useUser();
+  const { isLoaded } = useUser();
   const orders = useQuery(api.orders.getOrdersAdmin);
 
   if (!isLoaded) {
     return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
-
-  // Ensure only admins can access this page
-  // if (!ensureAdmin()) {
-  //   return <div className="flex justify-center items-center min-h-screen">Unauthorized</div>;
-  // }
 
   if (!orders) {
     return <div className="flex justify-center items-center min-h-screen">Loading orders...</div>;

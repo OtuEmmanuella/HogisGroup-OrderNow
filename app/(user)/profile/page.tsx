@@ -5,9 +5,7 @@ import { useUser, UserProfile } from '@clerk/nextjs';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id, Doc } from '@/convex/_generated/dataModel';
-import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -49,7 +47,6 @@ const formatCurrency = (amount: number) => {
 
 export default function ProfilePage() {
     const { user, isLoaded: isUserLoaded } = useUser();
-    const router = useRouter();
     const [feedbackOrderId, setFeedbackOrderId] = useState<Id<"orders"> | null>(null);
     const [feedbackText, setFeedbackText] = useState("");
     const [feedbackRating, setFeedbackRating] = useState<number>(5); // Default rating of 5
@@ -319,4 +316,4 @@ export default function ProfilePage() {
             </Tabs>
         </div>
     );
-} 
+}

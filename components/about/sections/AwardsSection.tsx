@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from "framer-motion"
 import { Star } from 'lucide-react'
+import Image from 'next/image'
 
 // Awards and recognition data
 const awards = [
@@ -59,15 +60,17 @@ const AwardsSection = () => {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            <img 
+            <Image 
               src="https://images.unsplash.com/photo-1551632436-cbf8dd35adfa?q=80&w=2071&auto=format&fit=crop" 
               alt="Award Celebration" 
+              width={2071}
+              height={1380}
               className="w-full h-[400px] object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-hotel-dark to-transparent opacity-70"></div>
             <div className="absolute bottom-0 left-0 right-0 p-8">
               <p className="text-xl font-serif italic">
-                "Hogis Group sets the standard for luxury hospitality in Nigeria."
+                &ldquo;Hogis Group sets the standard for luxury hospitality in Nigeria.&rdquo;
               </p>
               <p className="text-sm mt-2 text-white/70">— Hospitality Excellence Awards, 2023</p>
             </div>

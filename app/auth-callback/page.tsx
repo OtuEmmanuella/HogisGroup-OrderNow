@@ -18,26 +18,25 @@ export default function AuthCallbackPage() {
     const inviteCode = localStorage.getItem('inviteCode');
     localStorage.removeItem('inviteCode');
 
+    const joinCart = async (inviteCode: string) => {
+      try {
+        const result = await joinSharedCart({ inviteCode });
+        toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
+        router.push(`/shared-cart/${result.cartId}`);
+      } catch (error) {
+        console.error("Failed to join shared cart:", error);
+        toast.error(`Failed to join cart: ${error instanceof Error ? error.message : "Unknown error"}`);
+      }
+    };
+
     if (isSignedIn && inviteCode) {
       joinCart(inviteCode);
     } else if (isSignedIn) {
-      router.push('/home'); // Redirect to home if no invite code
+      router.push('/home');
     } else if (!isSignedIn) {
-      // Redirect to sign-in if not signed in
       router.push('/sign-in');
     }
   }, [isSignedIn, isLoaded, router, joinSharedCart]);
-
-  const joinCart = async (inviteCode: string) => {
-    try {
-      const result = await joinSharedCart({ inviteCode });
-      toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
-      router.push(`/shared-cart/${result.cartId}`);
-    } catch (error) {
-      console.error("Failed to join shared cart:", error);
-      toast.error(`Failed to join cart: ${error instanceof Error ? error.message : "Unknown error"}`);
-    }
-  };
 
   return (
     <div className="flex justify-center items-center min-h-screen">

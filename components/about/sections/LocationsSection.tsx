@@ -2,7 +2,9 @@
 
 import React from 'react'
 import { motion } from "framer-motion"
-import { MapPin, Star } from 'lucide-react'
+import { MapPin, Star, ChevronLeft } from "lucide-react"
+import Image from 'next/image'
+import Link from 'next/link'
 import { Button } from "@/components/ui/button"
 
 // Location data for the branches
@@ -11,7 +13,7 @@ const locations = [
     id: 1,
     name: "Hogis Marina Resort",
     address: "Marina Waterfront, Calabar",
-    image: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?q=80&w=2832&auto=format&fit=crop",
+    image: "https://images.unsplash.com/photo-1582719508461-905c673771fd?q=80&w=2825&auto=format&fit=crop",
     rating: 4.9,
   },
   {
@@ -23,9 +25,9 @@ const locations = [
   },
   {
     id: 3,
-    name: "Hogis Grand",
-    address: "Central Business District, Calabar",
-    image: "https://images.unsplash.com/photo-1455587734955-081b22074882?q=80&w=2070&auto=format&fit=crop",
+    name: "Hogis Plaza Hotel",
+    address: "Mary Slessor Avenue, Calabar",
+    image: "https://images.unsplash.com/photo-1566073771259-6a8506099945?q=80&w=2070&auto=format&fit=crop",
     rating: 4.7,
   },
 ];
@@ -38,6 +40,13 @@ const LocationsSection = ({ isVisible }: LocationsSectionProps) => {
   return (
     <section className="hotel-section bg-gradient-to-b from-hotel-navy to-hotel-dark py-20 md:py-32">
       <div className="container mx-auto px-4">
+        <Link href="/home">
+          <div className="flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-8">
+            <ChevronLeft className="w-4 h-4" />
+            <span>Back to Home</span>
+          </div>
+        </Link>
+        
         <motion.div 
           className="text-center mb-16"
           initial={{ opacity: 0, y: 20 }}
@@ -58,15 +67,16 @@ const LocationsSection = ({ isVisible }: LocationsSectionProps) => {
               key={location.id}
               className="relative rounded-xl overflow-hidden h-[450px] group"
               initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
+              animate={isVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
               transition={{ duration: 0.6, delay: index * 0.2 }}
               whileHover={{ y: -10 }}
             >
-              <img 
+              <Image 
                 src={location.image} 
-                alt={location.name} 
+                alt={location.name}
+                fill
                 className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 33vw"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-black/20"></div>
               
@@ -85,8 +95,8 @@ const LocationsSection = ({ isVisible }: LocationsSectionProps) => {
                   </div>
                   
                   <div className="pt-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                    <Button variant="outline" className="border-hotel-gold text-hotel-gold hover:bg-hotel-gold hover:text-hotel-dark">
-                      View Details
+                    <Button className="bg-hotel-gold hover:bg-amber-600 text-hotel-dark font-medium">
+                      Book Now
                     </Button>
                   </div>
                 </div>

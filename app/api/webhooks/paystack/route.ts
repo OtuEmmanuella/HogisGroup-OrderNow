@@ -1,7 +1,5 @@
-import { NextResponse } from 'next/server';
 import { getConvexClient } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
-import crypto from 'crypto';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

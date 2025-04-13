@@ -1,28 +1,14 @@
 'use client';
 
-import React from 'react';
+import React from "react";
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { useUser } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
-
-import { ensureAdmin } from '@/convex/lib/auth';
 
 export default function OrdersPage() {
   const router = useRouter();
-  const { user, isLoaded } = useUser();
   const orders = useQuery(api.orders.getOrdersAdmin);
-
-  if (!isLoaded) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
-  }
-
-  // Ensure only admins can access this page
-  // if (!ensureAdmin()) {
-  //   return <div className="flex justify-center items-center min-h-screen">Unauthorized</div>;
-  // }
 
   if (!orders) {
     return <div className="flex justify-center items-center min-h-screen">Loading orders...</div>;

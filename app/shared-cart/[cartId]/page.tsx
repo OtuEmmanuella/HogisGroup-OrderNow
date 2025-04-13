@@ -83,7 +83,6 @@ export default function SharedCartPage() {
 
   // Destructure data for easier access
   const {
-    _id,
     status,
     paymentMode,
     inviteCode,

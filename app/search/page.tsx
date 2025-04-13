@@ -67,6 +67,7 @@ export default function SearchPage() {
                         isAvailable: item.isAvailable
                     }}
                     onAddToCart={addToCart}
+                    isAddingToCart={false} // Adjust this value as needed
                  />
              ))}
            </div>

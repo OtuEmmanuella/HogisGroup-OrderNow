@@ -37,7 +37,7 @@ export default function SyncUserWithConvex() {
 
     syncUser();
     // Dependencies: only run when user object changes or loading state finishes
-  }, [user, isLoaded, updateUser]);
+  }, [user, isLoaded, updateUser, updateUserActivity]);
 
   // This component doesn't render anything
   return null;

@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { motion } from "framer-motion"
+import Image from 'next/image'
 
 const stats = [
   { value: "25+", label: "Years of Excellence" },
@@ -58,9 +59,11 @@ const WelcomeSection = () => {
             transition={{ duration: 0.8, delay: 0.2 }}
           >
             <div className="relative z-10 rounded-lg overflow-hidden shadow-2xl transform hover:scale-[1.02] transition-transform duration-500">
-              <img 
+              <Image 
                 src="https://images.unsplash.com/photo-1582719508461-905c673771fd?q=80&w=2825&auto=format&fit=crop" 
                 alt="Hogis Luxury Experience" 
+                width={2825}
+                height={1884}
                 className="w-full h-[500px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>

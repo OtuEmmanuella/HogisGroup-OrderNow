@@ -3,6 +3,7 @@
 import React from 'react'
 import { motion } from "framer-motion"
 import { ArrowRight } from "lucide-react"
+import Image from 'next/image'
 
 // Business data for the bento grid
 const businesses = [
@@ -102,9 +103,11 @@ const BusinessesSection = ({ isVisible }: BusinessesSectionProps) => {
             >
               {/* Background Image with Enhanced Overlay */}
               <div className="absolute inset-0 w-full h-full">
-                <img 
+                <Image 
                   src={business.image} 
-                  alt={business.title} 
+                  alt={business.title}
+                  width={2070}
+                  height={1380}
                   className="w-full h-full object-cover transition-transform duration-700 ease-in-out group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent opacity-90 group-hover:opacity-70 transition-opacity duration-500 backdrop-blur-[2px] group-hover:backdrop-blur-0"></div>

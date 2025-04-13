@@ -130,7 +130,9 @@ export default function AdminOrdersPage() {
               <TableCell><Badge variant="outline">{order.orderType}</Badge></TableCell>
               <TableCell>${order.totalAmount.toFixed(2)}</TableCell>
               <TableCell>
-                <StatusSelector orderId={order._id} currentStatus={order.status as OrderStatus} />
+                {order._id.__tableName === "orders" && (
+                  <StatusSelector orderId={order._id} currentStatus={order.status as OrderStatus} />
+                )}
               </TableCell>
                {/* <TableCell className="text-right">
                     <Button variant="ghost" size="icon" asChild>
