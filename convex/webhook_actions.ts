@@ -70,14 +70,14 @@ const verifiedPaystackData = v.object({
         phone: v.optional(v.string()),
         metadata: v.optional(v.any()),
         risk_action: v.optional(v.string()),
-        international_format_phone: v.optional(v.union(v.string(), v.null()))
+        international_format_phone: v.optional(v.union(v.string(), v.null())),
+        id: v.optional(v.number())
     }),
-    metadata: v.optional(v.object({ // Use optional chaining as metadata might not always be present/match
+    metadata: v.optional(v.object({
         cartId: v.optional(v.string()),
         userId: v.optional(v.string()),
         orderId: v.optional(v.string()),
-    })),
-    // Add other fields returned by verification API if needed
+    }))
 });
 
 interface PaystackVerifyResponse {
