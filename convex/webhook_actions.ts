@@ -40,14 +40,14 @@ const paystackEventPayload = v.object({
     amount: v.number(),
     customer: v.object({
       email: v.string(),
-      customer_code: v.string(),
-      first_name: v.string(),
-      last_name: v.string(),
-      phone: v.string(),
-      metadata: v.any(),
-      risk_action: v.string(),
-      international_format_phone: v.union(v.string(), v.null()),
-      id: v.number()
+      customer_code: v.optional(v.string()),
+      first_name: v.optional(v.string()),
+      last_name: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      metadata: v.optional(v.any()),
+      risk_action: v.optional(v.string()),
+      international_format_phone: v.optional(v.union(v.string(), v.null())),
+      id: v.optional(v.number())
     }),
     metadata: v.optional(v.object({
       cartId: v.optional(v.string()),
@@ -64,14 +64,14 @@ const verifiedPaystackData = v.object({
     amount: v.number(), // Amount in kobo
     customer: v.object({
         email: v.string(),
-        customer_code: v.string(),
-        first_name: v.string(),
-        last_name: v.string(),
-        phone: v.string(),
-        metadata: v.any(),
-        risk_action: v.string(),
-        international_format_phone: v.union(v.string(), v.null()),
-        id: v.number()
+        customer_code: v.optional(v.string()),
+        first_name: v.optional(v.string()),
+        last_name: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        metadata: v.optional(v.any()),
+        risk_action: v.optional(v.string()),
+        international_format_phone: v.optional(v.union(v.string(), v.null())),
+        id: v.optional(v.number())
     }),
     metadata: v.optional(v.object({
         cartId: v.optional(v.string()),
