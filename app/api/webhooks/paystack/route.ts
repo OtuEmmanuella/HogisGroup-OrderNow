@@ -11,7 +11,16 @@ interface PaystackEvent {
     reference: string;
     status: string;
     amount: number;
-    customer: { email: string };
+    customer: {
+      email: string;
+      customer_code?: string;
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+      metadata?: any;
+      risk_action?: string;
+      international_format_phone?: string | null;
+    };
     metadata?: {
       cartId?: string;
       userId?: string;
