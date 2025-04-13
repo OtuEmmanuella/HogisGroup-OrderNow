@@ -4,6 +4,9 @@ import { api } from '@/convex/_generated/api';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Define type for customer metadata
+type PaystackCustomerMetadata = Record<string, string | number | boolean | null>;
+
 // Define interface for Paystack webhook event
 interface PaystackEvent {
   event: string;
@@ -13,14 +16,14 @@ interface PaystackEvent {
     amount: number;
     customer: {
       email: string;
-      customer_code?: string;
-      first_name?: string;
-      last_name?: string;
-      phone?: string;
-      metadata?: Record<string, unknown>;
-      risk_action?: string;
-      international_format_phone?: string | null;
-      id?: number;
+      customer_code: string;
+      first_name: string;
+      last_name: string;
+      phone: string;
+      metadata: PaystackCustomerMetadata;
+      risk_action: string;
+      international_format_phone: string | null;
+      id: number;
     };
     metadata?: {
       cartId?: string;
