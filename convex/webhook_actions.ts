@@ -16,6 +16,16 @@ interface VerifyAndProcessPaystackWebhookSuccess {
       userId?: string;
       orderId?: string;
     } | undefined;
+    customer?: {
+      email: string;
+      customer_code?: string;
+      first_name?: string;
+      last_name?: string;
+      phone?: string;
+      metadata?: any;
+      risk_action?: string;
+      international_format_phone?: string | null;
+    };
   };
 }
 
@@ -50,6 +60,16 @@ const verifiedPaystackData = v.object({
     reference: v.string(),
     status: v.string(), // e.g., "success", "failed"
     amount: v.number(), // Amount in kobo
+    customer: v.object({
+        email: v.string(),
+        customer_code: v.optional(v.string()),
+        first_name: v.optional(v.string()),
+        last_name: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        metadata: v.optional(v.any()),
+        risk_action: v.optional(v.string()),
+        international_format_phone: v.optional(v.union(v.string(), v.null()))
+    }),
     metadata: v.optional(v.object({ // Use optional chaining as metadata might not always be present/match
         cartId: v.optional(v.string()),
         userId: v.optional(v.string()),
@@ -87,7 +107,7 @@ export const verifyAndProcessPaystackWebhook = action({
     "use node"; // Enable Node.js runtime HERE for this action
 
     const { event, data: webhookData } = args.payload;
-    const { reference, status: webhookStatus, amount: webhookAmount } = webhookData;
+    const { reference, status: webhookStatus, amount: webhookAmount, customer } = webhookData;
 
     console.log(`Action: Verifying Paystack event ${event} for ref: ${reference}`);
 
@@ -125,7 +145,8 @@ export const verifyAndProcessPaystackWebhook = action({
                     reference: verifiedData.reference,
                     status: verifiedData.status,
                     amount: verifiedData.amount,
-                    metadata: verifiedData.metadata
+                    metadata: verifiedData.metadata,
+                    customer: customer // Include customer data from webhook
                 }
             };
         }
@@ -144,7 +165,8 @@ export const verifyAndProcessPaystackWebhook = action({
                  reference: verifiedData.reference,
                  status: verifiedData.status,
                  amount: verifiedData.amount,
-                 metadata: verifiedData.metadata // Pass verified metadata
+                 metadata: verifiedData.metadata, // Pass verified metadata
+                 customer: customer // Include customer data from webhook
              }
         });
 
@@ -154,6 +176,7 @@ export const verifyAndProcessPaystackWebhook = action({
                status: verifiedData.status,
                amount: verifiedData.amount,
                metadata: verifiedData.metadata,
+               customer: customer // Include customer data from webhook
            }
         };
 
