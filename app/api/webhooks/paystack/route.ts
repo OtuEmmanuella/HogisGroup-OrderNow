@@ -20,6 +20,7 @@ interface PaystackEvent {
       metadata?: Record<string, unknown>;
       risk_action?: string;
       international_format_phone?: string | null;
+      id?: number;
     };
     metadata?: {
       cartId?: string;

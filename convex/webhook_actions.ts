@@ -16,7 +16,7 @@ interface VerifyAndProcessPaystackWebhookSuccess {
       userId?: string;
       orderId?: string;
     } | undefined;
-    customer?: {
+    customer: {
       email: string;
       customer_code?: string;
       first_name?: string;
@@ -25,6 +25,7 @@ interface VerifyAndProcessPaystackWebhookSuccess {
       metadata?: any;
       risk_action?: string;
       international_format_phone?: string | null;
+      id?: number;
     };
   };
 }
@@ -45,7 +46,8 @@ const paystackEventPayload = v.object({
       phone: v.optional(v.string()),
       metadata: v.optional(v.any()),
       risk_action: v.optional(v.string()),
-      international_format_phone: v.optional(v.union(v.string(), v.null()))
+      international_format_phone: v.optional(v.union(v.string(), v.null())),
+      id: v.optional(v.number())
     }),
     metadata: v.optional(v.object({
       cartId: v.optional(v.string()),
