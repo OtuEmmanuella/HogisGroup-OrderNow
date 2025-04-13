@@ -17,7 +17,7 @@ interface PaystackEvent {
       first_name?: string;
       last_name?: string;
       phone?: string;
-      metadata?: any;
+      metadata?: Record<string, unknown>;
       risk_action?: string;
       international_format_phone?: string | null;
     };
