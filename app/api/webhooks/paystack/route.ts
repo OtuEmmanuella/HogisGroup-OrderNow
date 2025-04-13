@@ -46,10 +46,12 @@ export async function POST(req: Request) {
   try {
     // Get the request body
     const body = await req.text();
+    console.log("Raw webhook body:", body);
     
     // Parse the body as JSON
     const event = JSON.parse(body) as PaystackEvent;
     console.log(`Paystack event: ${event.event} for reference: ${event.data.reference}`);
+    console.log("Customer data received:", JSON.stringify(event.data.customer));
 
     // Get Convex client
     const convex = await getConvexClient();

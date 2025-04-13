@@ -40,6 +40,7 @@ const paystackEventPayload = v.object({
     amount: v.number(),
     customer: v.object({
       email: v.string(),
+      // Add all the missing optional fields here:
       customer_code: v.optional(v.string()),
       first_name: v.optional(v.string()),
       last_name: v.optional(v.string()),
@@ -59,25 +60,25 @@ const paystackEventPayload = v.object({
 
 // Type for the data verified by Paystack API
 const verifiedPaystackData = v.object({
-    reference: v.string(),
-    status: v.string(), // e.g., "success", "failed"
-    amount: v.number(), // Amount in kobo
-    customer: v.object({
-        email: v.string(),
-        customer_code: v.optional(v.string()),
-        first_name: v.optional(v.string()),
-        last_name: v.optional(v.string()),
-        phone: v.optional(v.string()),
-        metadata: v.optional(v.any()),
-        risk_action: v.optional(v.string()),
-        international_format_phone: v.optional(v.union(v.string(), v.null())),
-        id: v.optional(v.number())
-    }),
-    metadata: v.optional(v.object({
-        cartId: v.optional(v.string()),
-        userId: v.optional(v.string()),
-        orderId: v.optional(v.string()),
-    }))
+  reference: v.string(),
+  status: v.string(),
+  amount: v.number(),
+  customer: v.object({
+      email: v.string(),
+      customer_code: v.optional(v.string()),
+      first_name: v.optional(v.string()),
+      last_name: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      metadata: v.optional(v.any()),
+      risk_action: v.optional(v.string()),
+      international_format_phone: v.optional(v.union(v.string(), v.null())),
+      id: v.optional(v.number())
+  }),
+  metadata: v.optional(v.object({
+      cartId: v.optional(v.string()),
+      userId: v.optional(v.string()),
+      orderId: v.optional(v.string()),
+  }))
 });
 
 interface PaystackVerifyResponse {
