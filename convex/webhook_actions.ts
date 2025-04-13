@@ -27,7 +27,16 @@ const paystackEventPayload = v.object({
     reference: v.string(),
     status: v.string(),
     amount: v.number(),
-    customer: v.object({ email: v.string() }),
+    customer: v.object({
+      email: v.string(),
+      customer_code: v.optional(v.string()),
+      first_name: v.optional(v.string()),
+      last_name: v.optional(v.string()),
+      phone: v.optional(v.string()),
+      metadata: v.optional(v.any()),
+      risk_action: v.optional(v.string()),
+      international_format_phone: v.optional(v.union(v.string(), v.null()))
+    }),
     metadata: v.optional(v.object({
       cartId: v.optional(v.string()),
       userId: v.optional(v.string()),
