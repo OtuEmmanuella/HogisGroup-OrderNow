@@ -16,14 +16,14 @@ interface PaystackEvent {
     amount: number;
     customer: {
       email: string;
-      customer_code: string;  // Include all fields that Paystack sends
-      first_name: string;
-      last_name: string;
-      phone: string;
-      metadata: PaystackCustomerMetadata;
-      risk_action: string;
-      international_format_phone: string | null;
-      id: number;
+      customer_code?: string;  // Make optional
+      first_name?: string;     // Make optional
+      last_name?: string;      // Make optional
+      phone?: string;          // Make optional
+      metadata?: PaystackCustomerMetadata;  // Make optional
+      risk_action?: string;    // Make optional
+      international_format_phone?: string | null;  // Make optional
+      id?: number;             // Make optional
     };
     metadata?: {
       cartId?: string;
