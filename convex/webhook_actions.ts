@@ -32,6 +32,7 @@ interface VerifyAndProcessPaystackWebhookSuccess {
 
 // --- Payload and Response Types ---
 
+// Updated paystackEventPayload validator that includes all customer fields
 const paystackEventPayload = v.object({
   event: v.string(),
   data: v.object({
@@ -148,7 +149,10 @@ export const verifyAndProcessPaystackWebhook = action({
                     status: verifiedData.status,
                     amount: verifiedData.amount,
                     metadata: verifiedData.metadata,
-                    customer: customer // Include customer data from webhook
+                    customer: {
+                      ...customer,
+                      email: customer.email || webhookData.customer.email // Ensure email is always present
+                    }
                 }
             };
         }
@@ -168,7 +172,10 @@ export const verifyAndProcessPaystackWebhook = action({
                  status: verifiedData.status,
                  amount: verifiedData.amount,
                  metadata: verifiedData.metadata, // Pass verified metadata
-                 customer: customer // Include customer data from webhook
+                 customer: {
+                   ...customer,
+                   email: customer.email || webhookData.customer.email // Ensure email is always present
+                 }
              }
         });
 
@@ -178,7 +185,10 @@ export const verifyAndProcessPaystackWebhook = action({
                status: verifiedData.status,
                amount: verifiedData.amount,
                metadata: verifiedData.metadata,
-               customer: customer // Include customer data from webhook
+               customer: {
+                 ...customer,
+                 email: customer.email || webhookData.customer.email // Ensure email is always present
+               }
            }
         };
 
