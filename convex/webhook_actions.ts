@@ -381,4 +381,4 @@ export const handleUserCreated = action({
   },
 });
 
-export { verifiedPaystackData };
+export { verifiedPaystackData, paystackEventPayload };
