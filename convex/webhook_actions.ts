@@ -40,7 +40,6 @@ const paystackEventPayload = v.object({
     amount: v.number(),
     customer: v.object({
       email: v.string(),
-      // Add all the fields that Paystack sends
       customer_code: v.optional(v.string()),
       first_name: v.optional(v.string()),
       last_name: v.optional(v.string()),
