@@ -6,6 +6,18 @@ import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api"; // Import internal for calling the mutation
 import { api } from "./_generated/api"; // Add this import for handleUserCreated function
 
+interface PaystackCustomer {
+  email: string;
+  customer_code?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  metadata?: Record<string, any>;
+  risk_action?: string;
+  international_format_phone?: string | null;
+  id?: number;
+}
+
 interface VerifyAndProcessPaystackWebhookSuccess {
   verifiedData: {
     reference: string;
@@ -16,22 +28,20 @@ interface VerifyAndProcessPaystackWebhookSuccess {
       userId?: string;
       orderId?: string;
     } | undefined;
-    customer: {
-      email: string;
-    };
+    customer: PaystackCustomer;
   };
 }
 
 // --- Payload and Response Types ---
 
-// Updated paystackEventPayload validator that includes only email in customer fields
+// Updated paystackEventPayload validator that accepts all Paystack fields
 const paystackEventPayload = v.object({
   event: v.string(),
   data: v.object({
     reference: v.string(),
     status: v.string(),
     amount: v.number(),
-    customer: v.any(), // Accept any customer object as long as it has an email
+    customer: v.any(), // Accept any customer object
     metadata: v.optional(v.any())
   })
 });
@@ -41,9 +51,7 @@ const verifiedPaystackData = v.object({
   reference: v.string(),
   status: v.string(),
   amount: v.number(),
-  customer: v.object({
-    email: v.string()
-  }),
+  customer: v.any(), // Accept any customer object here too
   metadata: v.optional(v.object({
     cartId: v.optional(v.string()),
     userId: v.optional(v.string()),
@@ -119,9 +127,7 @@ export const verifyAndProcessPaystackWebhook = action({
                     status: verifiedData.status,
                     amount: verifiedData.amount,
                     metadata: verifiedData.metadata,
-                    customer: {
-                      email: customer.email // Ensure email is always present
-                    }
+                    customer // Pass through the full customer object
                 }
             };
         }
@@ -141,9 +147,7 @@ export const verifyAndProcessPaystackWebhook = action({
                  status: verifiedData.status,
                  amount: verifiedData.amount,
                  metadata: verifiedData.metadata, // Pass verified metadata
-                 customer: {
-                   email: customer.email // Ensure email is always present
-                 }
+                 customer // Pass through the full customer object
              }
         });
 
@@ -153,9 +157,7 @@ export const verifyAndProcessPaystackWebhook = action({
                status: verifiedData.status,
                amount: verifiedData.amount,
                metadata: verifiedData.metadata,
-               customer: {
-                 email: customer.email // Ensure email is always present
-               }
+               customer // Pass through the full customer object
            }
         };
 

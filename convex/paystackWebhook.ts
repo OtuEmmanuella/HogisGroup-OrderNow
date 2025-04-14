@@ -1,9 +1,20 @@
 import { httpAction, ActionCtx } from "./_generated/server";
-import { internal } from "./_generated/api"; 
+import { internal } from "./_generated/api";
+import { v } from "convex/values";
+
+const paystackEventPayload = v.object({
+  event: v.string(),
+  data: v.object({
+    reference: v.string(),
+    status: v.string(),
+    amount: v.number(),
+    customer: v.any(), // Accept any customer object
+    metadata: v.optional(v.any())
+  })
+});
 
 export const paystackWebhook = httpAction(async (ctx: ActionCtx, request) => {
   "use node";
-  // Read the raw body as text first
   const body = await request.text();
   const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
   
@@ -16,7 +27,7 @@ export const paystackWebhook = httpAction(async (ctx: ActionCtx, request) => {
     // Parse and validate the incoming webhook payload
     const payload = JSON.parse(body);
     
-    // Simple validation - only check for required email field
+    // Basic validation of required fields
     if (!payload?.data?.customer?.email) {
       console.error("Missing required email in customer data");
       return new Response("Invalid payload: missing customer email", { status: 400 });
@@ -38,14 +49,19 @@ export const paystackWebhook = httpAction(async (ctx: ActionCtx, request) => {
       return new Response("Invalid Paystack signature", { status: 401 });
     }
     
-    // Process the event
+    // Process the verified event with webhook_actions handler
     try {
       await ctx.runMutation(internal.webhook_actions.handleVerifiedPaystackEvent, {
         event: payload.event,
-        verifiedData: verifyJson.data,
+        verifiedData: {
+          reference: payload.data.reference,
+          status: payload.data.status,
+          amount: payload.data.amount,
+          metadata: payload.data.metadata,
+          customer: payload.data.customer
+        }
       });
       
-      // Respond to Paystack quickly
       console.log("Paystack webhook received and processed.");
       return new Response(null, { status: 200 }); // Acknowledge receipt
     } catch (error) {
@@ -53,7 +69,7 @@ export const paystackWebhook = httpAction(async (ctx: ActionCtx, request) => {
       return new Response("Internal server error during processing", { status: 500 });
     }
   } catch (error) {
-    console.error("Error verifying Paystack webhook:", error);
-    return new Response("Error verifying Paystack webhook", { status: 500 });
+    console.error("Error processing Paystack webhook:", error);
+    return new Response("Error processing webhook", { status: 500 });
   }
 });
