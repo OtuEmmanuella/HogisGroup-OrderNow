@@ -31,9 +31,7 @@ const paystackEventPayload = v.object({
     reference: v.string(),
     status: v.string(),
     amount: v.number(),
-    customer: v.object({
-      email: v.string()
-    }),
+    customer: v.any(), // Accept any customer object as long as it has an email
     metadata: v.optional(v.any())
   })
 });
