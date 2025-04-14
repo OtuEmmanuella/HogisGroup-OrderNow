@@ -13,13 +13,13 @@ export const paystackWebhook = httpAction(async (ctx: ActionCtx, request) => {
   }
   
   try {
-    // Parse the incoming webhook payload
+    // Parse and validate the incoming webhook payload
     const payload = JSON.parse(body);
     
-    // Basic validation - check required fields
-    if (!payload.event || !payload.data || !payload.data.reference) {
-      console.error("Invalid payload structure");
-      return new Response("Invalid payload structure", { status: 400 });
+    // Simple validation - only check for required email field
+    if (!payload?.data?.customer?.email) {
+      console.error("Missing required email in customer data");
+      return new Response("Invalid payload: missing customer email", { status: 400 });
     }
     
     const reference = payload.data.reference;

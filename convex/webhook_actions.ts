@@ -18,21 +18,13 @@ interface VerifyAndProcessPaystackWebhookSuccess {
     } | undefined;
     customer: {
       email: string;
-      customer_code?: string;
-      first_name?: string;
-      last_name?: string;
-      phone?: string;
-      metadata?: any;
-      risk_action?: string;
-      international_format_phone?: string | null;
-      id?: number;
     };
   };
 }
 
 // --- Payload and Response Types ---
 
-// Updated paystackEventPayload validator that includes all customer fields
+// Updated paystackEventPayload validator that includes only email in customer fields
 const paystackEventPayload = v.object({
   event: v.string(),
   data: v.object({
@@ -40,22 +32,10 @@ const paystackEventPayload = v.object({
     status: v.string(),
     amount: v.number(),
     customer: v.object({
-      email: v.string(),
-      customer_code: v.optional(v.string()),
-      first_name: v.optional(v.string()),
-      last_name: v.optional(v.string()),
-      phone: v.optional(v.string()),
-      metadata: v.optional(v.any()),
-      risk_action: v.optional(v.string()),
-      international_format_phone: v.optional(v.union(v.string(), v.null())),
-      id: v.optional(v.number())
+      email: v.string()
     }),
-    metadata: v.optional(v.object({
-      cartId: v.optional(v.string()),
-      userId: v.optional(v.string()),
-      orderId: v.optional(v.string()),
-    })),
-  }),
+    metadata: v.optional(v.any())
+  })
 });
 
 // Type for the data verified by Paystack API
@@ -64,15 +44,7 @@ const verifiedPaystackData = v.object({
   status: v.string(),
   amount: v.number(),
   customer: v.object({
-    email: v.string(),
-    customer_code: v.optional(v.string()),
-    first_name: v.optional(v.string()),
-    last_name: v.optional(v.string()),
-    phone: v.optional(v.string()),
-    metadata: v.optional(v.any()),
-    risk_action: v.optional(v.string()),
-    international_format_phone: v.optional(v.union(v.string(), v.null())),
-    id: v.optional(v.number())
+    email: v.string()
   }),
   metadata: v.optional(v.object({
     cartId: v.optional(v.string()),
@@ -150,8 +122,7 @@ export const verifyAndProcessPaystackWebhook = action({
                     amount: verifiedData.amount,
                     metadata: verifiedData.metadata,
                     customer: {
-                      ...customer,
-                      email: customer.email || webhookData.customer.email // Ensure email is always present
+                      email: customer.email // Ensure email is always present
                     }
                 }
             };
@@ -173,8 +144,7 @@ export const verifyAndProcessPaystackWebhook = action({
                  amount: verifiedData.amount,
                  metadata: verifiedData.metadata, // Pass verified metadata
                  customer: {
-                   ...customer,
-                   email: customer.email || webhookData.customer.email // Ensure email is always present
+                   email: customer.email // Ensure email is always present
                  }
              }
         });
@@ -186,8 +156,7 @@ export const verifyAndProcessPaystackWebhook = action({
                amount: verifiedData.amount,
                metadata: verifiedData.metadata,
                customer: {
-                 ...customer,
-                 email: customer.email || webhookData.customer.email // Ensure email is always present
+                 email: customer.email // Ensure email is always present
                }
            }
         };
