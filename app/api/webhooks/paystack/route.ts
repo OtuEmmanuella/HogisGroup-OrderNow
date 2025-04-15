@@ -13,7 +13,7 @@ export async function OPTIONS() {
   });
 }
 
-// Redirect all traffic to Convex HTTP endpoint
+// Forward traffic to Convex HTTP endpoint
 export async function POST(req: Request) {
   const convexEndpoint = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexEndpoint) {
@@ -21,14 +21,20 @@ export async function POST(req: Request) {
     return new Response("Server configuration missing", { status: 500 });
   }
 
+  // Get the request body as text
+  const body = await req.text();
+  
   // Ensure the URL is properly constructed
   const webhookUrl = new URL("/paystackWebhook", convexEndpoint).toString();
-  console.log("Redirecting to Convex webhook endpoint:", webhookUrl);
+  console.log("Forwarding to Convex webhook endpoint:", webhookUrl);
 
-  // Forward the original request
+  // Forward the request with the required duplex option
   return fetch(webhookUrl, {
     method: "POST",
-    headers: req.headers,
-    body: req.body
-  });
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: body,
+    duplex: 'half'
+  } as RequestInit & { duplex: 'half' });
 }
