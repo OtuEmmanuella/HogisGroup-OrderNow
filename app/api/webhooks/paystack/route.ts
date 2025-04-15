@@ -1,6 +1,3 @@
-import { getConvexClient } from '@/lib/convex';
-import { api } from '@/convex/_generated/api';
-
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -17,12 +14,21 @@ export async function OPTIONS() {
 }
 
 // Redirect all traffic to Convex HTTP endpoint
-export async function POST() {
+export async function POST(req: Request) {
   const convexEndpoint = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!convexEndpoint) {
     console.error("NEXT_PUBLIC_CONVEX_URL is not set");
     return new Response("Server configuration missing", { status: 500 });
   }
 
-  return Response.redirect(`${convexEndpoint}/paystackWebhook`, 307); // 307 preserves POST method
+  // Ensure the URL is properly constructed
+  const webhookUrl = new URL("/paystackWebhook", convexEndpoint).toString();
+  console.log("Redirecting to Convex webhook endpoint:", webhookUrl);
+
+  // Forward the original request
+  return fetch(webhookUrl, {
+    method: "POST",
+    headers: req.headers,
+    body: req.body
+  });
 }
