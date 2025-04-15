@@ -34,19 +34,6 @@ interface VerifyAndProcessPaystackWebhookSuccess {
 
 // --- Payload and Response Types ---
 
-// Customer object validator
-const paystackCustomerValidator = v.object({
-  email: v.string(),
-  customer_code: v.optional(v.string()),
-  first_name: v.optional(v.string()),
-  last_name: v.optional(v.string()),
-  phone: v.optional(v.string()),
-  metadata: v.optional(v.object({})), // Metadata should be a record or undefined
-  risk_action: v.optional(v.string()),
-  international_format_phone: v.optional(v.union(v.string(), v.null())),
-  id: v.optional(v.number())
-});
-
 // Updated paystackEventPayload validator that accepts all Paystack fields
 const paystackEventPayload = v.object({
   event: v.string(),
@@ -54,12 +41,8 @@ const paystackEventPayload = v.object({
     reference: v.string(),
     status: v.string(),
     amount: v.number(),
-    customer: paystackCustomerValidator,
-    metadata: v.optional(v.object({
-      cartId: v.optional(v.string()),
-      userId: v.optional(v.string()),
-      orderId: v.optional(v.string())
-    }))
+    customer: v.any(), // Accept any customer object
+    metadata: v.optional(v.any())
   })
 });
 
@@ -68,11 +51,11 @@ const verifiedPaystackData = v.object({
   reference: v.string(),
   status: v.string(),
   amount: v.number(),
-  customer: paystackCustomerValidator,
+  customer: v.any(), // Accept any customer object here too
   metadata: v.optional(v.object({
     cartId: v.optional(v.string()),
     userId: v.optional(v.string()),
-    orderId: v.optional(v.string())
+    orderId: v.optional(v.string()),
   }))
 });
 

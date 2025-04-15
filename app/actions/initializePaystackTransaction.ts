@@ -23,9 +23,9 @@ export type PaystackMetadata = {
 
 // Structure of expected successful response data
 interface InitializeSuccessData {
-  authorization_url: string;
-  access_code: string;
-  reference: string;
+    authorization_url: string;
+    access_code: string;
+    reference: string;
 }
 
 export async function initializePaystackTransaction({
@@ -48,21 +48,20 @@ export async function initializePaystackTransaction({
 
   // Get user details for email
   const user = await convex.query(api.users.getUserById, { userId });
-  if (!user || !user.email) throw new Error("User email not found");
+   if (!user || !user.email) throw new Error("User email not found");
 
   // Get amount from order
   if (typeof order.totalAmount !== 'number' || order.totalAmount < 0) {
       throw new Error("Invalid order total amount.");
   }
   const amountInKobo = Math.round(order.totalAmount * 100);
-  if (amountInKobo <= 0) {
-      throw new Error("Order total must be positive to initiate payment.");
-  }
+   if (amountInKobo <= 0) {
+       throw new Error("Order total must be positive to initiate payment.");
+   }
 
   // Update URLs
   const cancelUrl = `${baseUrl}/checkout`;
   const callbackUrl = `${baseUrl}/payment/success`;
-  const webhookUrl = "https://hogis-group-order-now.vercel.app/api/webhooks/paystack";
 
   const metadata: PaystackMetadata = {
     orderId,
@@ -75,7 +74,6 @@ export async function initializePaystackTransaction({
       amount: amountInKobo,
       currency: "NGN",
       callback_url: callbackUrl,
-      webhook_url: webhookUrl,
       metadata: JSON.stringify(metadata),
   };
 
@@ -137,9 +135,9 @@ export async function initializePaystackTransaction({
   } catch (error: unknown) {
      console.error("Error during Paystack transaction initialization fetch/processing:", error);
      let errorMessage = "Failed to initialize Paystack transaction.";
-     if (error instanceof Error) {
-         errorMessage = error.message;
-     }
+      if (error instanceof Error) {
+          errorMessage = error.message;
+      }
      throw new Error(errorMessage);
   }
-}
+} 
