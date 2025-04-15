@@ -12,7 +12,9 @@ const nextConfig = {
   },
   
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000', 'hogis-group-order-now.vercel.app']
+    }
   },
 
   // Your existing config options here...

@@ -133,7 +133,7 @@ export async function POST(req: Request) {
     try {
       console.log("Calling Convex with verified data");
       const convex = new ConvexHttpClient(convexUrl);
-      convex.setAuth(convexDeployKey);
+      convex.setAuth(`Bearer ${convexDeployKey}`); // Add 'Bearer' prefix to deployment key
 
       await convex.action(api.webhook_actions.processVerifiedPaystackWebhook, {
         event: payload.event,
