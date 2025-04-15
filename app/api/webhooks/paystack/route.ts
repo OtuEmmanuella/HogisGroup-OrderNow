@@ -1,3 +1,6 @@
+import { getConvexClient } from '@/lib/convex';
+import { api } from '@/convex/_generated/api';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -13,28 +16,25 @@ export async function OPTIONS() {
   });
 }
 
-// Forward traffic to Convex HTTP endpoint
+// Handle Paystack webhook directly
 export async function POST(req: Request) {
-  const convexEndpoint = process.env.NEXT_PUBLIC_CONVEX_URL;
-  if (!convexEndpoint) {
-    console.error("NEXT_PUBLIC_CONVEX_URL is not set");
-    return new Response("Server configuration missing", { status: 500 });
+  try {
+    // Get the request body
+    const body = await req.text();
+    console.log("Paystack webhook received");
+    
+    // Get Convex client
+    const convex = await getConvexClient();
+    
+    // Forward to Convex webhook action for processing
+    await convex.action(api.webhook_actions.verifyAndProcessPaystackWebhook, {
+      payload: JSON.parse(body)
+    });
+    
+    console.log("Webhook processed successfully");
+    return new Response("Webhook Processed Successfully", { status: 200 });
+  } catch (error) {
+    console.error("Webhook Error:", error);
+    return new Response(`Webhook Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
   }
-
-  // Get the request body as text
-  const body = await req.text();
-  
-  // Ensure the URL is properly constructed with /api prefix
-  const webhookUrl = new URL("/api/paystackWebhook", convexEndpoint).toString();
-  console.log("Forwarding to Convex webhook endpoint:", webhookUrl);
-
-  // Forward the request with the required duplex option
-  return fetch(webhookUrl, {
-    method: "POST",
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: body,
-    duplex: 'half'
-  } as RequestInit & { duplex: 'half' });
 }
