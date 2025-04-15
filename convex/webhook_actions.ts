@@ -1,10 +1,12 @@
 // Note: No "use node" at the top level for the internal mutation
 
 import { v } from "convex/values";
+// Ensure action is imported if not already
 import { internalMutation, action, ActionCtx } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api"; // Import internal for calling the mutation
-import { api } from "./_generated/api"; // Add this import for handleUserCreated function
+// Ensure api is imported for the public action reference
+import { api } from "./_generated/api";
 
 interface PaystackCustomer {
   email: string;
@@ -170,7 +172,6 @@ export const verifyAndProcessPaystackWebhook = action({
  },
 });
 
-
 // --- Internal Mutation for DB Updates ---
 
 /**
@@ -265,6 +266,33 @@ export const handleVerifiedPaystackEvent = internalMutation({
         }
     } else {
          console.log(`Mutation: Ignoring verified Paystack event type: ${event}`);
+    }
+  },
+});
+
+/**
+ * PUBLIC ACTION: Receives pre-verified data from Vercel API route
+ * and schedules the internal mutation for processing.
+ * Requires authentication via Deploy Key when called externally.
+ */
+export const processVerifiedPaystackWebhook = action({
+  args: {
+    event: v.string(),
+    verifiedData: verifiedPaystackData,
+  },
+  handler: async (ctx, args) => {
+    const { event, verifiedData } = args;
+    console.log(`Public Action: Processing pre-verified Paystack data for ref: ${verifiedData.reference}`);
+
+    try {
+      await ctx.runMutation(internal.webhook_actions.handleVerifiedPaystackEvent, {
+        event,
+        verifiedData,
+      });
+      return { success: true };
+    } catch (error) {
+      console.error(`Public Action: Failed to process webhook for ref ${verifiedData.reference}:`, error);
+      throw new Error(`Failed to process webhook: ${error instanceof Error ? error.message : "Unknown error"}`);
     }
   },
 });
