@@ -26,9 +26,16 @@ export async function POST(req: Request) {
   console.log("Redirecting to Convex webhook endpoint:", webhookUrl);
 
   // Forward the original request
+  // Create new headers, only forwarding Content-Type
+  const headers = new Headers();
+  if (req.headers.get('content-type')) {
+    headers.set('content-type', req.headers.get('content-type')!);
+  }
+  // Add any other headers you specifically need to forward, e.g., Paystack signature if used
+
   return fetch(webhookUrl, {
     method: "POST",
-    headers: req.headers,
+    headers: headers, // Use the filtered headers
     body: req.body,
     // @ts-expect-error - duplex is required when streaming bodies
     duplex: 'half'
