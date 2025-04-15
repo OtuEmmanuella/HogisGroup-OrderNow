@@ -24,8 +24,8 @@ export async function POST(req: Request) {
   // Get the request body as text
   const body = await req.text();
   
-  // Ensure the URL is properly constructed
-  const webhookUrl = new URL("/paystackWebhook", convexEndpoint).toString();
+  // Ensure the URL is properly constructed with /api prefix
+  const webhookUrl = new URL("/api/paystackWebhook", convexEndpoint).toString();
   console.log("Forwarding to Convex webhook endpoint:", webhookUrl);
 
   // Forward the request with the required duplex option

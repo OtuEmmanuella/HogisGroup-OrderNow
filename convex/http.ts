@@ -7,16 +7,16 @@ import { paystackWebhook } from "./paystackWebhook";
 
 const http = httpRouter();
 
-// Define the Paystack webhook handler endpoint
+// Define the Paystack webhook handler endpoint with /api prefix
 http.route({
-  path: "/paystackWebhook",
+  path: "/api/paystackWebhook",
   method: "POST",
   handler: paystackWebhook,
 });
 
 // Define the Clerk webhook handler endpoint
 http.route({
-  path: "/clerkWebhook",
+  path: "/api/clerkWebhook",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     // Get the headers and body
@@ -62,7 +62,7 @@ if (resendApiKey) {
 }
 
 http.route({
-  path: "/sendEmail",
+  path: "/api/sendEmail",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
     const body = await request.json();
