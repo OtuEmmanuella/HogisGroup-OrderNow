@@ -41,7 +41,7 @@ const paystackCustomerValidator = v.object({
   first_name: v.optional(v.string()),
   last_name: v.optional(v.string()),
   phone: v.optional(v.string()),
-  metadata: v.optional(v.object({})), // Empty object type instead of any
+  metadata: v.optional(v.object({})), // Metadata should be a record or undefined
   risk_action: v.optional(v.string()),
   international_format_phone: v.optional(v.union(v.string(), v.null())),
   id: v.optional(v.number())
