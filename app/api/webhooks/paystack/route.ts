@@ -29,6 +29,8 @@ export async function POST(req: Request) {
   return fetch(webhookUrl, {
     method: "POST",
     headers: req.headers,
-    body: req.body
+    body: req.body,
+    // @ts-expect-error - duplex is required when streaming bodies
+    duplex: 'half'
   });
 }
