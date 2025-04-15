@@ -4,24 +4,32 @@ import { api } from '@/convex/_generated/api';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+interface PaystackCustomerMetadata {
+  userId?: string;
+  cartId?: string;
+  orderId?: string;
+}
+
+interface PaystackCustomer {
+  email: string;
+  customer_code?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  metadata?: PaystackCustomerMetadata;
+  risk_action?: string;
+  international_format_phone?: string | null;
+  id?: number;
+}
+
 interface PaystackWebhookData {
   event: string;
   data: {
     reference: string;
     status: string;
     amount: number;
-    customer: {
-      email: string;
-      customer_code?: string;
-      first_name?: string;
-      last_name?: string;
-      phone?: string;
-      metadata?: Record<string, any>;
-      risk_action?: string;
-      international_format_phone?: string | null;
-      id?: number;
-    };
-    metadata?: Record<string, any>;
+    customer: PaystackCustomer;
+    metadata?: PaystackCustomerMetadata;
   };
 }
 
