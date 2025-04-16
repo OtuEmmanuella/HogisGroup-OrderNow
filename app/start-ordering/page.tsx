@@ -16,7 +16,7 @@ import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input"; // Import Input component
+import { Input } from "@/components/ui/input";
 
 type OnboardingStep = 'welcome' | 'selectBranch' | 'selectOrderType' | 'selectOrderTypeForCart';
 type PaymentMode = 'split' | 'payAll';
@@ -39,15 +39,14 @@ export default function StartOrderingPage() {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();
   const createSharedCart = useMutation(api.sharedCarts.createSharedCart);
-  const joinSharedCart = useMutation(api.sharedCarts.joinSharedCart); // Mutation hook for joining
+  const joinSharedCart = useMutation(api.sharedCarts.joinSharedCart);
 
   useEffect(() => {
     setSelectedBranch(null);
     setStep('welcome');
     setSelectedPaymentMode('split');
-    setInviteCodeInput(''); // Reset invite code input
+    setInviteCodeInput('');
   }, [setGlobalBranchId, setGlobalOrderType]);
-
 
   const handleBranchSelect = (branchId: Id<'branches'> | null) => {
     if (branchId) {
@@ -88,34 +87,29 @@ export default function StartOrderingPage() {
     setStep('selectOrderTypeForCart');
   };
 
-  // Handler for joining a cart with an invite code
   const handleJoinCart = async () => {
-      console.log("handleJoinCart called");
-      if (!inviteCodeInput.trim()) {
-          toast.warning("Please enter an invite code.");
-          return;
-      }
-      if (!isSignedIn) {
-          // Store invite code in localStorage
-          localStorage.setItem('inviteCode', inviteCodeInput.trim());
-          // Display Clerk auth modal with redirect URL
-          window.location.href = `/sign-in?redirect_url=/auth-callback`;
-          return;
-      }
+    if (!inviteCodeInput.trim()) {
+      toast.warning("Please enter an invite code.");
+      return;
+    }
+    if (!isSignedIn) {
+      localStorage.setItem('inviteCode', inviteCodeInput.trim());
+      window.location.href = `/sign-in?redirect_url=/auth-callback`;
+      return;
+    }
 
-      setIsJoiningCart(true);
-      try {
-          const result = await joinSharedCart({ inviteCode: inviteCodeInput.trim() });
-          toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
-          router.push(`/shared-cart/${result.cartId}`); // Redirect to the cart page
-      } catch (error) {
-          console.error("Failed to join shared cart:", error);
-          toast.error(`Failed to join cart: ${error instanceof Error ? error.message : "Unknown error"}`);
-      } finally {
-          setIsJoiningCart(false);
-      }
+    setIsJoiningCart(true);
+    try {
+      const result = await joinSharedCart({ inviteCode: inviteCodeInput.trim() });
+      toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
+      router.push(`/shared-cart/${result.cartId}`);
+    } catch (error) {
+      console.error("Failed to join shared cart:", error);
+      toast.error(`Failed to join cart: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsJoiningCart(false);
+    }
   };
-
 
   const animationProps = {
     initial: { opacity: 0, y: 20 },
@@ -125,53 +119,84 @@ export default function StartOrderingPage() {
   };
 
   if (!isLoaded) {
-      return (
-          <div className="flex justify-center items-center min-h-screen">
-              <p>Loading...</p>
-          </div>
-      );
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <p>Loading...</p>
+      </div>
+    );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 md:py-16 flex flex-col items-center justify-center min-h-[calc(100vh-150px)]">
+    <div className="container mx-auto px-4 py-8 md:py-16 flex flex-col items-center justify-center min-h-[calc(100vh-150px)] relative overflow-hidden">
       <AnimatePresence mode="wait">
         {/* Welcome Step */}
         {step === 'welcome' && (
           <motion.div
             key="welcome"
             {...animationProps}
-            className="text-center flex flex-col items-center w-full max-w-lg" // Added width constraint
+            className="text-center flex flex-col items-center w-full max-w-lg relative"
           >
+            {/* Top right image */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+              className="absolute -top-20 -right-20 pointer-events-none z-10"
+            >
+              <Image
+                src="/images/coffee ordernow.webp"
+                alt="Coffee cup"
+                width={150}
+                height={150}
+                className="object-contain"
+              />
+            </motion.div>
+
+            {/* Bottom left image */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+              className="absolute -bottom-20 -left-20 pointer-events-none z-10"
+            >
+              <Image
+                src="/ordernow bag.webp"
+                alt="Order bag"
+                width={150}
+                height={150}
+                className="object-contain"
+              />
+            </motion.div>
+
             <Image src={logo} alt="Hogis Logo" width={80} height={80} className="mb-6" />
             <h1 className="text-3xl md:text-4xl font-bold mb-3">Welcome to Hogis OrderNow</h1>
             <p className="text-muted-foreground mb-8 max-w-md">
-                Ready for some delicious food? Let&apos;s get your order started quickly.
+              Ready for some delicious food? Let&apos;s get your order started quickly.
             </p>
             <Button size="lg" onClick={() => setStep('selectBranch')} className="mb-8 bg-[#F96521] hover:bg-[#e05a19]">
               Get Started
             </Button>
 
-            {/* Join Cart Section - Visible on Welcome */}
             <div className="w-full border-t pt-6 mt-6">
-                <h3 className="text-lg font-medium mb-3">Have an Invite Code?</h3>
-                <div className="flex gap-2 justify-center">
-                    <Input
-                        type="text"
-                        placeholder="Enter invite code"
-                        value={inviteCodeInput}
-                        onChange={(e) => setInviteCodeInput(e.target.value)}
-                        className="max-w-xs"
-                        disabled={isJoiningCart} // Only disable while actively joining a cart
-                    />
-                    <Button
-                        variant="secondary"
-                        onClick={handleJoinCart}
-                        disabled={isJoiningCart || !inviteCodeInput.trim()}
-                    >
-                        {isJoiningCart ? "Joining..." : "Join Cart"}
-                    </Button>
-                </div>
-                 {!isSignedIn && <p className="text-sm text-muted-foreground mt-2">Sign in to join a cart.</p>}
+              <h3 className="text-lg font-medium mb-3">Have an Invite Code?</h3>
+              <div className="flex gap-2 justify-center">
+                <Input
+                  type="text"
+                  placeholder="Enter invite code"
+                  value={inviteCodeInput}
+                  onChange={(e) => setInviteCodeInput(e.target.value)}
+                  className="max-w-xs"
+                  disabled={isJoiningCart}
+                />
+                <Button
+                  variant="secondary"
+                  onClick={handleJoinCart}
+                  disabled={isJoiningCart || !inviteCodeInput.trim()}
+                >
+                  {isJoiningCart ? "Joining..." : "Join Cart"}
+                </Button>
+              </div>
+              {!isSignedIn && <p className="text-sm text-muted-foreground mt-2">Sign in to join a cart.</p>}
             </div>
           </motion.div>
         )}
@@ -185,27 +210,26 @@ export default function StartOrderingPage() {
           >
             <h2 className="text-2xl font-semibold text-center mb-6">First, select your branch</h2>
             <BranchSelector onSelectBranch={handleBranchSelect} />
-             {/* Join Cart Section - Also visible here */}
-             <div className="w-full border-t pt-6 mt-8 text-center">
-                <h3 className="text-lg font-medium mb-3">Have an Invite Code?</h3>
-                <div className="flex gap-2 justify-center">
-                    <Input
-                        type="text"
-                        placeholder="Enter invite code"
-                        value={inviteCodeInput}
-                        onChange={(e) => setInviteCodeInput(e.target.value)}
-                        className="max-w-xs"
-                        disabled={isJoiningCart} // Only disable while actively joining a cart
-                    />
-                    <Button
-                        variant="secondary"
-                        onClick={handleJoinCart}
-                        disabled={isJoiningCart || !inviteCodeInput.trim()}
-                    >
-                        {isJoiningCart ? "Joining..." : "Join Cart"}
-                    </Button>
-                </div>
-                 {!isSignedIn && <p className="text-sm text-muted-foreground mt-2">Sign in to join a cart.</p>}
+            <div className="w-full border-t pt-6 mt-8 text-center">
+              <h3 className="text-lg font-medium mb-3">Have an Invite Code?</h3>
+              <div className="flex gap-2 justify-center">
+                <Input
+                  type="text"
+                  placeholder="Enter invite code"
+                  value={inviteCodeInput}
+                  onChange={(e) => setInviteCodeInput(e.target.value)}
+                  className="max-w-xs"
+                  disabled={isJoiningCart}
+                />
+                <Button
+                  variant="secondary"
+                  onClick={handleJoinCart}
+                  disabled={isJoiningCart || !inviteCodeInput.trim()}
+                >
+                  {isJoiningCart ? "Joining..." : "Join Cart"}
+                </Button>
+              </div>
+              {!isSignedIn && <p className="text-sm text-muted-foreground mt-2">Sign in to join a cart.</p>}
             </div>
           </motion.div>
         )}
@@ -220,12 +244,10 @@ export default function StartOrderingPage() {
             <h2 className="text-2xl font-semibold text-center mb-6">How would you like your order?</h2>
             <OrderTypeSelector selectedType={null} onSelectType={handleOrderTypeSelect} />
 
-            {/* Group Order Section */}
             <div className="mt-8 text-center border-t pt-6">
               <h3 className="text-lg font-medium mb-4">Ordering with Friends?</h3>
               {isSignedIn ? (
                 <>
-                  {/* Payment Mode Selection */}
                   <RadioGroup
                     defaultValue="split"
                     value={selectedPaymentMode}
@@ -242,47 +264,44 @@ export default function StartOrderingPage() {
                     </div>
                   </RadioGroup>
 
-                  {/* Start Group Order Button */}
                   <Button
                     variant="outline"
                     size="lg"
                     onClick={handleStartGroupOrder}
                     disabled={isCreatingCart}
-                    className="mb-6" // Add margin below start button
+                    className="mb-6"
                   >
                     {isCreatingCart ? "Starting..." : "Start Group Order"}
                   </Button>
 
-                   {/* Join Cart Section - Also visible here */}
-                   <div className="w-full border-t pt-6">
-                        <h3 className="text-lg font-medium mb-3">Or Join with Invite Code?</h3>
-                        <div className="flex gap-2 justify-center">
-                            <Input
-                                type="text"
-                                placeholder="Enter invite code"
-                                value={inviteCodeInput}
-                                onChange={(e) => setInviteCodeInput(e.target.value)}
-                                className="max-w-xs"
-                                disabled={isJoiningCart} // Only disable while actively joining a cart
-                            />
-                            <Button
-                                variant="secondary"
-                                onClick={handleJoinCart}
-                                disabled={isJoiningCart || !inviteCodeInput.trim()}
-                            >
-                                {isJoiningCart ? "Joining..." : "Join Cart"}
-                            </Button>
-                        </div>
+                  <div className="w-full border-t pt-6">
+                    <h3 className="text-lg font-medium mb-3">Or Join with Invite Code?</h3>
+                    <div className="flex gap-2 justify-center">
+                      <Input
+                        type="text"
+                        placeholder="Enter invite code"
+                        value={inviteCodeInput}
+                        onChange={(e) => setInviteCodeInput(e.target.value)}
+                        className="max-w-xs"
+                        disabled={isJoiningCart}
+                      />
+                      <Button
+                        variant="secondary"
+                        onClick={handleJoinCart}
+                        disabled={isJoiningCart || !inviteCodeInput.trim()}
+                      >
+                        {isJoiningCart ? "Joining..." : "Join Cart"}
+                      </Button>
                     </div>
+                  </div>
                 </>
               ) : (
-                 // Sign-in prompt if not signed in
-                 <>
-                    <p className="text-muted-foreground mb-4">Sign in to start or join a group order.</p>
-                    <Button variant="outline" size="lg" onClick={() => router.push('/sign-in')}>
-                        Sign in
-                    </Button>
-                 </>
+                <>
+                  <p className="text-muted-foreground mb-4">Sign in to start or join a group order.</p>
+                  <Button variant="outline" size="lg" onClick={() => router.push('/sign-in')}>
+                    Sign in
+                  </Button>
+                </>
               )}
             </div>
           </motion.div>

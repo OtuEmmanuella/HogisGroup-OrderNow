@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
 
-export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
-
-// Define interfaces for Paystack webhook payload
+// Define interfaces for Paystack webhook payloads.
 interface PaystackCustomer {
   email: string;
   customer_code?: string;
@@ -46,7 +43,7 @@ interface PaystackVerifyResponse {
   };
 }
 
-// Add OPTIONS handler for CORS preflight
+// Allow CORS preflight.
 export async function OPTIONS() {
   return new Response(null, {
     status: 200,
@@ -54,12 +51,12 @@ export async function OPTIONS() {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
-    }
+    },
   });
 }
 
-// Handle Paystack webhook directly
 export async function POST(req: Request) {
+  // Read environment variables.
   const paystackSecretKey = process.env.PAYSTACK_SECRET_KEY;
   const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
   const convexDeployKey = process.env.CONVEX_DEPLOYMENT_KEY;
@@ -72,14 +69,12 @@ export async function POST(req: Request) {
     );
   }
 
-  // Get raw body for signature verification
+  // Read and parse the raw request body.
   const rawBody = await req.text();
-  
   let payload: PaystackWebhookData;
   try {
     payload = JSON.parse(rawBody);
     console.log("Received Paystack payload:", payload);
-
     if (!payload?.event || !payload?.data?.reference) {
       console.error("Invalid payload structure received:", payload);
       return NextResponse.json(
@@ -95,7 +90,7 @@ export async function POST(req: Request) {
     );
   }
 
-  // Verify with Paystack API
+  // Verify the transaction with Paystack.
   const reference = payload.data.reference;
   const verifyUrl = `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`;
 
@@ -107,7 +102,7 @@ export async function POST(req: Request) {
       },
     });
 
-    const verifyJson = await verifyResponse.json() as PaystackVerifyResponse;
+    const verifyJson = (await verifyResponse.json()) as PaystackVerifyResponse;
     console.log("Paystack verification response:", verifyJson);
 
     if (!verifyResponse.ok || !verifyJson.status || !verifyJson.data) {
@@ -120,7 +115,7 @@ export async function POST(req: Request) {
 
     const verifiedData = verifyJson.data;
 
-    // Verify amount matches to prevent tampering
+    // Ensure the verified amount matches the payload to prevent tampering.
     if (verifiedData.amount !== payload.data.amount) {
       console.error("Amount mismatch - potential tampering!");
       return NextResponse.json(
@@ -129,11 +124,12 @@ export async function POST(req: Request) {
       );
     }
 
-    // Call Convex action with verified data
+    // Now call your Convex action with the verified data.
     try {
       console.log("Calling Convex with verified data");
       const convex = new ConvexHttpClient(convexUrl);
-      // Set the deployment key directly without Bearer prefix
+      // Use setAuth with your deployment key. In your version, setAdminAuth is not available.
+      // Ensure that your deployment key is in the format expected by Convex (for example, "prod:alias|<token>").
       convex.setAuth(convexDeployKey);
 
       await convex.action(api.webhook_actions.processVerifiedPaystackWebhook, {
@@ -143,8 +139,8 @@ export async function POST(req: Request) {
           status: verifiedData.status,
           amount: verifiedData.amount,
           metadata: verifiedData.metadata,
-          customer: payload.data.customer
-        }
+          customer: payload.data.customer,
+        },
       });
 
       console.log("Successfully processed webhook through Convex");
