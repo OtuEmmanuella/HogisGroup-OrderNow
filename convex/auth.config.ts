@@ -1,7 +1,7 @@
 export default {
   providers: [
     {
-      domain: "https://amusing-bobcat-35.clerk.accounts.dev",
+      domain:process.env.CLERK_ISSUER_URL,
       applicationID: "convex",
     },
     // Add production configuration

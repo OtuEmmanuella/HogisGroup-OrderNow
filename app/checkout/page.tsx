@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useOrderContext } from '@/context/OrderContext';
 import { useQuery, useMutation } from 'convex/react';
-import { useAction } from 'convex/react';
+// Remove useAction import if no longer needed, or keep if used elsewhere
+// import { useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -40,6 +41,8 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { type Id } from '@/convex/_generated/dataModel';
+// Import the server action directly
+import { initializePaystackTransaction } from '@/app/actions/initializePaystackTransaction';
 
 // Define proper interfaces to avoid using 'any'
 interface DeliveryAddress {
@@ -98,8 +101,10 @@ export default function CheckoutPage() {
   );
 
   const createOrder = useMutation(api.orders.createOrder);
-  const initializePaystack = useAction(api.paystack.initializeTransaction);
-  const initializeSharedCartPayment = useAction(api.paystack.initializeSharedCartTransaction);
+  const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
+  // Remove useAction hooks for Paystack
+  // const initializePaystack = useAction(api.paystack.initializeTransaction);
+  // const initializeSharedCartPayment = useAction(api.paystack.initializeSharedCartTransaction);
 
   const validationResult = useQuery(
     api.promotions.validatePromoCode,
@@ -183,6 +188,8 @@ export default function CheckoutPage() {
 
     setIsSubmitting(true);
 
+    let orderId: Id<"orders"> | null = null;
+
     try {
       const completeDeliveryAddress = requiresAddress && deliveryAddress
         ? {
@@ -209,74 +216,74 @@ export default function CheckoutPage() {
         : {};
 
       // Ensure selectedOrderType is one of the allowed values before assigning
-      // This assertion assumes selectedOrderType comes from a controlled source (like useOrderContext)
-      // that should already align with these values. Add runtime validation if necessary.
       const validatedOrderType = selectedOrderType as "Delivery" | "Dine-In" | "Take-out";
 
       const orderPayload: OrderPayload = {
-        branchId: selectedBranchId!, // Assuming selectedBranchId is already Id<'branches'>
+        branchId: selectedBranchId!,
         userId: user.id as Id<'users'>, // Type assertion for Clerk user ID
         customerName,
         items: cartItems.map((item) => ({
-          menuItemId: item._id, // Assuming item._id is already Id<'menuItems'>
+          menuItemId: item._id as Id<'menuItems'>, // Corrected from item.id to item._id
           quantity: item.quantity,
+          // Add customization details if applicable
         })),
-        orderType: validatedOrderType, // Use the asserted type
-        appliedPromoId:
-          validationResult && 'promoId' in validationResult
-            ? validationResult.promoId // Assuming this is already Id<'promotions'>
-            : undefined,
-        ...(requiresAddress && { deliveryAddress: completeDeliveryAddress }),
-        ...(requiresPickupTime && {
-          pickupTime: Date.parse(`1970-01-01T${pickupTime}:00`), // Keep as number (Unix timestamp)
-        }),
-        ...dineInDetails, // Keep as defined above (dineInDateTime as number)
+        orderType: validatedOrderType,
+        appliedPromoId: validationResult && 'promoId' in validationResult ? validationResult.promoId : undefined,
+        deliveryAddress: completeDeliveryAddress,
+        pickupTime: requiresPickupTime && pickupTime ? parsePickupTime(pickupTime) : undefined,
+        ...dineInDetails,
       };
 
-      const orderId = await createOrder(orderPayload);
+      console.log('Creating order with payload:', orderPayload);
+      orderId = await createOrder(orderPayload);
+      console.log('Order created successfully with ID:', orderId);
 
-      toast({
-        title: 'Order Placed!',
-        description: 'Redirecting to payment gateway...',
-      });
+      // --- Initiate Paystack Payment using the server action --- 
+      if (orderId) {
+        console.log('Initializing payment for order:', orderId);
+        const paymentResult = await initializePaystackTransaction({ orderId });
 
-      let paymentUrl: string | undefined;
-      if (activeSharedCartId) {
-        // Assuming you have access to the cartId in this component
-        // and the userId of the current user
-        const cartId = activeSharedCartId;
-        const userId = user.id; // Assuming user.id is the Clerk user ID
-        paymentUrl = await initializeSharedCartPayment({
-          cartId: cartId as Id<"sharedCarts">,
-          userId: userId,
-          email: user.primaryEmailAddress.emailAddress,
-          amountKobo: finalTotalKobo,
-        });
+        if (paymentResult?.authorizationUrl) {
+          console.log('Redirecting to Paystack:', paymentResult.authorizationUrl);
+          // Redirect user to Paystack's payment page
+          window.location.href = paymentResult.authorizationUrl;
+          // Optionally clear cart/reset flow here or wait for webhook confirmation
+          // resetOrderFlow(); 
+        } else {
+          throw new Error('Failed to get Paystack authorization URL.');
+        }
       } else {
-        paymentUrl = await initializePaystack({
-          orderId, // Assuming orderId is Id<'orders'> from createOrder
-          email: user.primaryEmailAddress.emailAddress,
-          amountKobo: finalTotalKobo,
-        });
+        throw new Error('Order ID not received after creation.');
       }
 
-      if (paymentUrl) {
-        resetOrderFlow();
-        window.location.href = paymentUrl;
-      } else {
-        throw new Error('Failed to get payment URL from Paystack.');
+    } catch (error: any) {
+      console.error('Failed to create order or initiate payment:', error);
+      // Attempt to revert order creation if payment initiation failed?
+      // This is complex and depends on your desired transactional behavior.
+      // If orderId exists, maybe update its status to 'Payment Failed'
+      if (orderId) {
+        try {
+          // Use the mutation hook to update status to 'Cancelled' as 'Payment Failed' is not a valid status
+          await updateOrderStatus({ orderId, status: 'Cancelled' });
+        } catch (updateError) {
+          console.error(`Failed to update order ${orderId} status after payment error:`, updateError);
+        }
       }
-    } catch (error) {
-      console.error('Checkout process failed:', error);
+
       toast({
-        title: 'Checkout Failed',
-        description:
-          error instanceof Error ? error.message : 'An unexpected error occurred.',
+        title: 'Error',
+        description: `An error occurred: ${error.message || 'Unknown error'}`,
         variant: 'destructive'
       });
       setIsSubmitting(false);
     }
   };
+
+  // Function to parse HH:MM time string into minutes past midnight
+  function parsePickupTime(time: string): number {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes;
+  }
 
   function combineDateAndTime(date: Date, time: string): Date {
     const [hours, minutes] = time.split(':').map(Number);
