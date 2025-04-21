@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'; // Import useEffect
 import { useParams, useRouter } from 'next/navigation';
-import { useQuery, useMutation, useAction } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react'; // Remove useAction
 import { api } from '@/convex/_generated/api';
 import { Doc, Id } from '@/convex/_generated/dataModel';
 import { useAuth } from '@clerk/nextjs';
@@ -14,6 +14,8 @@ import { Separator } from "@/components/ui/separator";
 import Image from 'next/image';
 import { Trash2, PlusCircle, Users, ShoppingBag, CreditCard, Copy, UserCircle, Loader2, RotateCcw } from 'lucide-react'; // Icons + Loader
 import { useOrderContext } from '@/context/OrderContext'; // Import context hook
+// Import the server action directly
+import { initializeSharedCartTransaction } from '@/app/actions/initializeSharedCartTransaction';
 
 // Helper function to format currency (adjust as needed)
 const formatCurrency = (amountKobo: number) => {
@@ -64,7 +66,8 @@ export default function SharedCartPage() {
   const removeItemMutation = useMutation(api.sharedCarts.removeSharedCartItem);
   const startSplitPaymentMutation = useMutation(api.sharedCarts.startSplitPayment);
   const startPayAllMutation = useMutation(api.sharedCarts.startPayAll);
-  const initializePaymentAction = useAction(api.paystack.initializeSharedCartTransaction);
+  // Remove the incorrect useAction hook
+  // const initializePaymentAction = useAction(api.paystack.initializeSharedCartTransaction);
   const cancelCartMutation = useMutation(api.sharedCarts.cancelSharedCart); // Add cancel mutation
 
   // Loading and error states
@@ -124,44 +127,86 @@ export default function SharedCartPage() {
 
   const handlePayMyShare = async () => {
       if (!currentUserMemberInfo || currentUserMemberInfo.paymentStatus === 'paid') {
-          toast.info("You have already paid your share.");
+          toast.info("You have already paid your share or are not part of this cart.");
           return;
       }
+      if (status !== 'open' && status !== 'paying') {
+          toast.warning(`Cannot initiate payment. Cart status is: ${status}`);
+          return;
+      }
+
       setIsPayingMyShare(true);
       try {
-          const result = await startSplitPaymentMutation({ cartId });
+          // 1. Start the split payment process (calculates amount due)
+          const splitResult = await startSplitPaymentMutation({ cartId });
 
-          if (result.success && result.paymentData) {
-              const authorization_url = await initializePaymentAction(result.paymentData);
-              window.location.href = authorization_url;
+          // Check if the mutation itself was successful and returned payment data
+          if (splitResult && splitResult.success && splitResult.paymentData) {
+              // 2. Initialize Paystack transaction with the calculated amount
+              const paymentUrl = await initializeSharedCartTransaction(splitResult.paymentData);
+
+              // Check if a valid URL was returned
+              if (paymentUrl && typeof paymentUrl === 'string') {
+                  console.log("Redirecting to Paystack for split payment:", paymentUrl);
+                  window.location.href = paymentUrl; // Redirect to Paystack
+              } else {
+                  throw new Error("Failed to get payment URL from initialization.");
+              }
           } else {
-              throw new Error("Failed to prepare payment.");
+              // Handle cases where startSplitPaymentMutation didn't return expected data
+              const errorMessage = (splitResult && typeof splitResult === 'object' && 'message' in splitResult && typeof splitResult.message === 'string')
+                                   ? splitResult.message
+                                   : "Failed to prepare split payment.";
+              throw new Error(errorMessage);
           }
+
       } catch (error) {
-          console.error("Failed to initiate split payment:", error);
+          console.error("Failed to pay my share:", error);
           toast.error(`Payment failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      } finally {
           setIsPayingMyShare(false);
       }
   };
 
   const handlePayForAll = async () => {
       if (!isInitiator) {
-          toast.error("Only the initiator can pay for all.");
+          toast.error("Only the cart initiator can pay for everyone.");
           return;
       }
+      if (status !== 'open') {
+          toast.warning(`Cannot initiate payment. Cart status is: ${status}`);
+          return;
+      }
+
       setIsPayingForAll(true);
       try {
-          const result = await startPayAllMutation({ cartId });
+          // 1. Start the pay-all process (locks cart, gets total amount)
+          const payAllResult = await startPayAllMutation({ cartId });
 
-          if (result.success && result.paymentData) {
-              const authorization_url = await initializePaymentAction(result.paymentData);
-              window.location.href = authorization_url;
-           } else {
-               throw new Error("Failed to prepare payment.");
+          // Check if the mutation was successful and returned payment data
+          if (payAllResult && payAllResult.success && payAllResult.paymentData) {
+              // 2. Initialize Paystack transaction with the full amount
+              const paymentUrl = await initializeSharedCartTransaction(payAllResult.paymentData);
+
+              // Check if a valid URL was returned
+              if (paymentUrl && typeof paymentUrl === 'string') {
+                  console.log("Redirecting to Paystack for pay-all:", paymentUrl);
+                  window.location.href = paymentUrl; // Redirect to Paystack
+              } else {
+                  throw new Error("Failed to get payment URL from initialization.");
+              }
+          } else {
+              // Handle cases where startPayAllMutation didn't return expected data
+              const errorMessage = (payAllResult && typeof payAllResult === 'object' && 'message' in payAllResult && typeof payAllResult.message === 'string')
+                                   ? payAllResult.message
+                                   : "Failed to prepare pay-all payment.";
+              throw new Error(errorMessage);
           }
+
       } catch (error) {
-          console.error("Failed to initiate pay-all:", error);
+          console.error("Failed to pay for all:", error);
           toast.error(`Payment failed: ${error instanceof Error ? error.message : "Unknown error"}`);
+      } finally {
           setIsPayingForAll(false);
       }
   };
