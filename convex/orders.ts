@@ -54,6 +54,32 @@ export const getOrderWithDetails = query({
 
 // Removed getValidTicketsForEvent
 
+// Internal mutation for webhook to update status without admin check
+export const internalUpdateOrderStatusFromWebhook = internalMutation({
+  args: {
+    orderId: v.id("orders"),
+    status: v.union(
+      v.literal("Pending Confirmation"),
+      v.literal("Received"),
+      v.literal("Preparing"),
+      v.literal("Ready for Pickup"),
+      v.literal("Out for Delivery"),
+      v.literal("Completed"),
+      v.literal("Cancelled")
+    ),
+  },
+  handler: async (ctx, { orderId, status }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) {
+      console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order not found: ${orderId}`);
+      throw new Error("Order not found");
+    }
+    await ctx.db.patch(orderId, { status });
+    console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order ${orderId} status updated to ${status} by webhook.`);
+    // Optionally trigger other internal actions like notifications here
+  },
+});
+
 // Update the status of an existing order
 export const updateOrderStatus = mutation({
   args: {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
-import { ConvexHttpClient } from 'convex/browser';
+import { getConvexClient } from '@/lib/convex';
 import { api } from '@/convex/_generated/api';
+import { Id } from '@/convex/_generated/dataModel'; // Import Id type
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -132,17 +133,25 @@ export async function POST(req: Request) {
     // Call Convex action with verified data
     try {
       console.log("Calling Convex with verified data");
-      const convex = new ConvexHttpClient(convexUrl);
-      // Set the deployment key directly without Bearer prefix
-      convex.setAuth(convexDeployKey);
+      // Use getConvexClient for consistency and server-side usage
+      const convex = await getConvexClient();
+      // Assuming getConvexClient handles authentication based on environment variables.
+      // If CONVEX_DEPLOYMENT_KEY is needed specifically, adjust getConvexClient or auth method.
 
+      // Prepare metadata with correctly typed orderId
+      const metadataForConvex = verifiedData.metadata ? {
+        ...verifiedData.metadata,
+        orderId: verifiedData.metadata.orderId ? verifiedData.metadata.orderId as Id<"orders"> : undefined
+      } : undefined;
+
+      // Ensure the correct action path is used
       await convex.action(api.webhook_actions.processVerifiedPaystackWebhook, {
         event: payload.event,
         verifiedData: {
           reference: verifiedData.reference,
           status: verifiedData.status,
           amount: verifiedData.amount,
-          metadata: verifiedData.metadata,
+          metadata: metadataForConvex, // Use the correctly typed metadata
           customer: payload.data.customer
         }
       });

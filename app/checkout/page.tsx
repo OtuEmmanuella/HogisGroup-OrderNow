@@ -79,9 +79,9 @@ export default function CheckoutPage() {
     selectedBranchId,
     selectedOrderType,
     cartItems,
-    cartTotal,
-    resetOrderFlow,
-    activeSharedCartId
+    cartTotal
+    // resetOrderFlow, // Removed as unused
+    // activeSharedCartId // Removed as unused
   } = useOrderContext();
 
   const [deliveryAddress, setDeliveryAddress] = useState<AddressFormData | null>(null);
@@ -256,7 +256,7 @@ export default function CheckoutPage() {
         throw new Error('Order ID not received after creation.');
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) { // Use unknown for safer type handling
       console.error('Failed to create order or initiate payment:', error);
       // Attempt to revert order creation if payment initiation failed?
       // This is complex and depends on your desired transactional behavior.
@@ -270,9 +270,12 @@ export default function CheckoutPage() {
         }
       }
 
+      // Check if error is an instance of Error before accessing message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
       toast({
         title: 'Error',
-        description: `An error occurred: ${error.message || 'Unknown error'}`,
+        description: `An error occurred: ${errorMessage}`,
         variant: 'destructive'
       });
       setIsSubmitting(false);

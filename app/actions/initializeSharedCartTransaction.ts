@@ -4,7 +4,7 @@ import { getConvexClient } from "@/lib/convex";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import baseUrl from "@/lib/baseUrl";
-import { auth } from "@clerk/nextjs/server";
+// import { auth } from "@clerk/nextjs/server"; // Removed unused import
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_API_URL = "https://api.paystack.co";

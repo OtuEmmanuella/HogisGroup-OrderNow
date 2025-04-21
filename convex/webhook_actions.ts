@@ -1,7 +1,7 @@
 "use node";
 
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api"; // Import internal here
 import { v } from "convex/values";
 // Potentially import email sending utility if needed
 // import { sendWelcomeEmail } from "./lib/sendEmail"; 
@@ -55,3 +55,69 @@ export const handleUserCreated = action({
 });
 
 // Add other webhook-related actions here if needed
+
+/**
+ * Action to process verified Paystack webhook events.
+ * Updates order status based on payment confirmation.
+ */
+export const processVerifiedPaystackWebhook = action({
+  args: {
+    event: v.string(),
+    verifiedData: v.object({
+      reference: v.string(),
+      status: v.string(),
+      amount: v.number(),
+      metadata: v.optional(v.object({
+        cartId: v.optional(v.string()),
+        userId: v.optional(v.string()),
+        orderId: v.optional(v.id("orders")), // Expecting Convex Order ID
+      })),
+      customer: v.object({
+        email: v.string(),
+        customer_code: v.optional(v.string()),
+        first_name: v.optional(v.string()),
+        last_name: v.optional(v.string()),
+        phone: v.optional(v.string()),
+        metadata: v.optional(v.any()), // Use v.any() if structure varies
+        risk_action: v.optional(v.string()),
+      }),
+    }),
+  },
+  handler: async (ctx, args) => {
+    console.log(`Webhook Action: Processing verified Paystack event: ${args.event} for reference: ${args.verifiedData.reference}`);
+
+    // Handle successful charge event
+    if (args.event === "charge.success" && args.verifiedData.status === "success") {
+      const orderId = args.verifiedData.metadata?.orderId;
+
+      if (!orderId) {
+        console.error(`Webhook Action: Missing orderId in metadata for Paystack reference: ${args.verifiedData.reference}`);
+        // Decide if this is a critical error. Maybe log and return success to Paystack?
+        // throw new Error("Missing orderId in webhook metadata");
+        return { success: false, message: "Missing orderId" };
+      }
+
+      try {
+        console.log(`Webhook Action: Updating order ${orderId} status to 'Received' using internal mutation.`);
+        // Update the order status in Convex using the internal mutation
+        await ctx.runMutation(internal.orders.internalUpdateOrderStatusFromWebhook, {
+          orderId: orderId,
+          status: "Received", // Set status to 'Received' on successful payment
+        });
+        console.log(`Webhook Action: Order ${orderId} status updated successfully.`);
+        return { success: true };
+      } catch (error) {
+        console.error(`Webhook Action: Failed to update order status for ${orderId}:`, error);
+        // Decide how to handle mutation failure. Retry? Log?
+        // Throwing error here might cause Paystack to retry the webhook.
+        throw new Error(`Failed to update order status: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    } else {
+      console.log(`Webhook Action: Received event ${args.event} with status ${args.verifiedData.status}. No action taken.`);
+      // Handle other events or statuses if needed
+    }
+
+    // Acknowledge receipt to Paystack even if no action was taken for this event type
+    return { success: true, message: "Event received, no action needed." };
+  },
+});

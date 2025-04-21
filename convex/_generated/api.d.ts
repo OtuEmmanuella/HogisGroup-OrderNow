@@ -24,6 +24,7 @@ import type * as orders from "../orders.js";
 import type * as promotions from "../promotions.js";
 import type * as sharedCarts from "../sharedCarts.js";
 import type * as users from "../users.js";
+import type * as webhook_actions from "../webhook_actions.js";
 
 import type {
   ApiFromModules,
@@ -56,6 +57,7 @@ declare const fullApi: ApiFromModules<{
   promotions: typeof promotions;
   sharedCarts: typeof sharedCarts;
   users: typeof users;
+  webhook_actions: typeof webhook_actions;
 }>;
 declare const fullApiWithMounts: typeof fullApi;
 

@@ -95,7 +95,7 @@ export async function POST(req: Request) {
       
       // Call Convex action to handle welcome email
       const actionResult = await convex.action(api.webhook_actions.handleUserCreated, {
-        userId,
+        userId, 
         email,
         name
       });
