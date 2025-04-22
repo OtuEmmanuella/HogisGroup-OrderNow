@@ -76,6 +76,7 @@ export const processVerifiedPaystackWebhook = action({
         referrer: v.optional(v.string()) // Add optional referrer
       })),
       customer: v.object({
+        id: v.optional(v.number()), // Add optional id field
         email: v.string(),
         customer_code: v.optional(v.string()),
         first_name: v.optional(v.string()),
