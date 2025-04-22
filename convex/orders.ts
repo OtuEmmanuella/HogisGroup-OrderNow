@@ -70,11 +70,21 @@ export const internalUpdateOrderStatusFromWebhook = internalMutation({
     paymentReference: v.optional(v.string()), // Add optional paymentReference
   },
   handler: async (ctx, { orderId, status, paymentReference }) => { // Destructure paymentReference
-    const order = await ctx.db.get(orderId);
+    console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Received args: orderId=${orderId}, status=${status}, paymentReference=${paymentReference}`);
+
+    let order;
+    try {
+      order = await ctx.db.get(orderId);
+    } catch (getError) {
+      console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Error fetching order ${orderId}:`, getError);
+      throw new Error(`Failed to fetch order: ${getError instanceof Error ? getError.message : String(getError)}`);
+    }
+
     if (!order) {
       console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order not found: ${orderId}`);
       throw new Error("Order not found");
     }
+    console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Found order: ${orderId}`);
 
     // Prepare the patch object
     const patchData: { status: typeof status, paymentReference?: string } = { status };
@@ -82,8 +92,13 @@ export const internalUpdateOrderStatusFromWebhook = internalMutation({
       patchData.paymentReference = paymentReference;
     }
 
-    await ctx.db.patch(orderId, patchData);
-    console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order ${orderId} status updated to ${status}${paymentReference ? ` with payment ref ${paymentReference}` : ''} by webhook.`);
+    try {
+      await ctx.db.patch(orderId, patchData);
+      console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order ${orderId} status updated to ${status}${paymentReference ? ` with payment ref ${paymentReference}` : ''} by webhook.`);
+    } catch (patchError) {
+      console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Error patching order ${orderId} with data ${JSON.stringify(patchData)}:`, patchError);
+      throw new Error(`Failed to patch order: ${patchError instanceof Error ? patchError.message : String(patchError)}`);
+    }
     // Optionally trigger other internal actions like notifications here
   },
 });

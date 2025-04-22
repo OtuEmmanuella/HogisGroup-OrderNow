@@ -87,6 +87,8 @@ export const processVerifiedPaystackWebhook = action({
     }),
   },
   handler: async (ctx, args) => {
+    console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Received webhook args: ${JSON.stringify(args, null, 2)}`); // Log entire args object
+
     console.log(`Webhook Action: Processing verified Paystack event: ${args.event} for reference: ${args.verifiedData.reference}`);
 
     // Handle successful charge event
@@ -96,6 +98,8 @@ export const processVerifiedPaystackWebhook = action({
       const userId = args.verifiedData.metadata?.userId; // User who made the payment
       const reference = args.verifiedData.reference;
       const amountPaid = args.verifiedData.amount;
+
+      console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Extracted Metadata - OrderID: ${orderId}, CartID: ${cartId}, UserID: ${userId}, Reference: ${reference}`); // Log extracted IDs
 
       if (orderId) {
         // --- Handle Regular Order Payment --- 
