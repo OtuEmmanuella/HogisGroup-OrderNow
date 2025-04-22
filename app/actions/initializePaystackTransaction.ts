@@ -74,7 +74,7 @@ export async function initializePaystackTransaction({
       amount: amountInKobo,
       currency: "NGN",
       callback_url: callbackUrl,
-      metadata: JSON.stringify(metadata),
+      metadata: metadata, // Pass the object directly
   };
 
   console.log("Initializing Paystack transaction via fetch for order with payload:", payload);
@@ -140,4 +140,4 @@ export async function initializePaystackTransaction({
       }
      throw new Error(errorMessage);
   }
-} 
+}
