@@ -143,7 +143,12 @@ export default function SharedCartPage() {
           // Check if the mutation itself was successful and returned payment data
           if (splitResult && splitResult.success && splitResult.paymentData) {
               // 2. Initialize Paystack transaction with the calculated amount
-              const paymentUrl = await initializeSharedCartTransaction(splitResult.paymentData);
+              const paymentUrl = await initializeSharedCartTransaction({
+                  cartId: cartId, // Pass cartId from component scope
+                  userId: splitResult.paymentData.metadata.userId, // Get userId from metadata
+                  email: splitResult.paymentData.email, // Get email from paymentData
+                  amountKobo: splitResult.paymentData.amount, // Get amount from paymentData (assuming it's in kobo)
+              });
 
               // Check if a valid URL was returned
               if (paymentUrl && typeof paymentUrl === 'string') {
@@ -186,7 +191,12 @@ export default function SharedCartPage() {
           // Check if the mutation was successful and returned payment data
           if (payAllResult && payAllResult.success && payAllResult.paymentData) {
               // 2. Initialize Paystack transaction with the full amount
-              const paymentUrl = await initializeSharedCartTransaction(payAllResult.paymentData);
+              const paymentUrl = await initializeSharedCartTransaction({
+                  cartId: cartId, // Pass cartId from component scope
+                  userId: payAllResult.paymentData.metadata.userId, // Get userId from metadata
+                  email: payAllResult.paymentData.email, // Get email from paymentData
+                  amountKobo: payAllResult.paymentData.amount, // Get amount from paymentData (assuming it's in kobo)
+              });
 
               // Check if a valid URL was returned
               if (paymentUrl && typeof paymentUrl === 'string') {

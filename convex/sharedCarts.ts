@@ -479,44 +479,92 @@ export const startSplitPayment = mutation({
       throw new Error("Authentication required to start payment.");
     }
 
+    // Fetch user details to get email
+    const userProfile = await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("userId", user.userId))
+      .first();
+
+    if (!userProfile || !userProfile.email) {
+      throw new Error("User profile or email not found.");
+    }
+
     const cart = await ctx.db.get(args.cartId);
     if (!cart) {
       throw new Error("Cart not found.");
     }
 
-    if (cart.initiatorId !== user.userId) {
-      throw new Error("Only the initiator can start the payment process.");
+    // Allow initiator OR member to initiate their own payment
+    const member = await ctx.db
+      .query("sharedCartMembers")
+      .withIndex("by_cart_user", (q) =>
+        q.eq("cartId", args.cartId).eq("userId", user.userId)
+      )
+      .first();
+
+    if (!member) {
+        throw new Error("You must be a member of this cart to pay your share.");
     }
 
-    if (cart.status !== "open") {
-      throw new Error("Cart must be open to start payment.");
+    // Cart must be 'open' or 'paying' to initiate a payment
+    if (cart.status !== "open" && cart.status !== "paying") {
+      throw new Error("Cart must be open or in the paying process to initiate payment.");
     }
 
     if (cart.paymentMode !== "split") {
       throw new Error("Cart is not in split payment mode.");
     }
 
-    // Calculate total and amount due per member
-    const totalAmount = await calculateCartTotal(ctx.db, args.cartId);
-    const members = await ctx.db
-      .query("sharedCartMembers")
-      .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
-      .collect();
+    // If cart is already 'paying', use existing amountDue, otherwise calculate
+    let amountDueForThisMember: number;
+    if (cart.status === "paying" && member.amountDue > 0) {
+        amountDueForThisMember = member.amountDue;
+        console.log(`Split payment resuming for cart ${args.cartId}. Amount due for member ${user.userId}: ${amountDueForThisMember}`);
+    } else {
+        // Calculate total and amount due per member if starting fresh
+        const totalAmount = await calculateCartTotal(ctx.db, args.cartId);
+        const allMembers = await ctx.db
+          .query("sharedCartMembers")
+          .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
+          .collect();
 
-    if (members.length === 0) {
-      throw new Error("Cannot start payment with no members in the cart.");
+        if (allMembers.length === 0) {
+          throw new Error("Cannot start payment with no members in the cart.");
+        }
+
+        const amountDuePerMember = Math.ceil(totalAmount / allMembers.length); // Round up
+
+        // Update cart status to 'paying' and member amounts if it was 'open'
+        if (cart.status === "open") {
+            await ctx.db.patch(args.cartId, { status: "paying", totalAmount });
+            for (const m of allMembers) {
+              await ctx.db.patch(m._id, { amountDue: amountDuePerMember });
+            }
+            console.log(`Split payment started for cart ${args.cartId}. Amount due per member: ${amountDuePerMember}`);
+            amountDueForThisMember = amountDuePerMember;
+        } else {
+            // Should not happen if status is 'paying' and amountDue was 0, but handle defensively
+            throw new Error("Cart is in 'paying' state but amount due calculation is needed unexpectedly.");
+        }
     }
 
-    const amountDuePerMember = Math.ceil(totalAmount / members.length); // Round up to ensure total is covered
+    // Generate a unique reference for this payment attempt
+    const paymentReference = `sc_${args.cartId.substring(0, 4)}_${user.userId.substring(0, 4)}_${nanoid(6)}`;
 
-    // Update cart status to 'paying' and member amounts
-    await ctx.db.patch(args.cartId, { status: "paying", totalAmount });
-    for (const member of members) {
-      await ctx.db.patch(member._id, { amountDue: amountDuePerMember });
-    }
+    // Return data needed for Paystack initialization
+    const paymentData = {
+        amount: amountDueForThisMember, // Amount in kobo/cents
+        email: userProfile.email,
+        reference: paymentReference,
+        metadata: {
+            cartId: args.cartId,
+            userId: user.userId,
+            type: 'shared_cart_split',
+            // Add any other relevant metadata
+        },
+    };
 
-    console.log(`Split payment started for cart ${args.cartId}. Amount due per member: ${amountDuePerMember}`);
-    return { success: true, amountDuePerMember };
+    return { success: true, paymentData }; // Return paymentData object
   },
 });
 
@@ -533,6 +581,16 @@ export const startPayAll = mutation({
     const user = await getUserFromAuth(ctx);
     if (!user) {
       throw new Error("Authentication required to start payment.");
+    }
+
+    // Fetch user details to get email
+    const userProfile = await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("userId", user.userId))
+      .first();
+
+    if (!userProfile || !userProfile.email) {
+      throw new Error("User profile or email not found.");
     }
 
     const cart = await ctx.db.get(args.cartId);
@@ -556,12 +614,27 @@ export const startPayAll = mutation({
     const totalAmount = await calculateCartTotal(ctx.db, args.cartId);
 
     // Update cart status to 'locked' (prevents further changes)
-    // The initiator will then trigger the actual payment transaction separately
     await ctx.db.patch(args.cartId, { status: "locked", totalAmount });
 
     console.log(`Pay-all process initiated for cart ${args.cartId}. Total: ${totalAmount}. Cart locked.`);
-    // Return the total amount so the initiator knows how much to pay
-    return { success: true, totalAmount };
+
+    // Generate a unique reference for this payment attempt
+    const paymentReference = `sc_all_${args.cartId.substring(0, 4)}_${user.userId.substring(0, 4)}_${nanoid(6)}`;
+
+    // Return data needed for Paystack initialization
+    const paymentData = {
+        amount: totalAmount, // Amount in kobo/cents
+        email: userProfile.email,
+        reference: paymentReference,
+        metadata: {
+            cartId: args.cartId,
+            userId: user.userId, // Initiator is paying
+            type: 'shared_cart_payall',
+        },
+    };
+
+    // Return the payment data needed to initialize the transaction
+    return { success: true, paymentData };
   },
 });
 
