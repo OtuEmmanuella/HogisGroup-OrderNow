@@ -75,16 +75,8 @@ export const processVerifiedPaystackWebhook = action({
         cancel_action: v.optional(v.string()), // Add optional cancel_action
         referrer: v.optional(v.string()) // Add optional referrer
       })),
-      customer: v.object({
-        id: v.optional(v.number()), // Add optional id field
-        email: v.string(),
-        customer_code: v.optional(v.string()),
-        first_name: v.optional(v.string()),
-        last_name: v.optional(v.string()),
-        phone: v.optional(v.string()),
-        metadata: v.optional(v.any()), // Use v.any() if structure varies
-        risk_action: v.optional(v.string()),
-      }),
+      // Use v.any() for the entire customer object to accept any structure
+      customer: v.any(),
     }),
   },
   handler: async (ctx, args) => {
