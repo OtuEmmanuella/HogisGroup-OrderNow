@@ -138,10 +138,12 @@ export async function POST(req: Request) {
       // Assuming getConvexClient handles authentication based on environment variables.
       // If CONVEX_DEPLOYMENT_KEY is needed specifically, adjust getConvexClient or auth method.
 
-      // Prepare metadata with correctly typed orderId
+      // Prepare metadata with correctly typed IDs
       const metadataForConvex = verifiedData.metadata ? {
         ...verifiedData.metadata,
-        orderId: verifiedData.metadata.orderId ? verifiedData.metadata.orderId as Id<"orders"> : undefined
+        orderId: verifiedData.metadata.orderId ? verifiedData.metadata.orderId as Id<"orders"> : undefined,
+        // Cast cartId from string to Id<"sharedCarts">
+        cartId: verifiedData.metadata.cartId ? verifiedData.metadata.cartId as Id<"sharedCarts"> : undefined
       } : undefined;
 
       // Ensure the correct action path is used

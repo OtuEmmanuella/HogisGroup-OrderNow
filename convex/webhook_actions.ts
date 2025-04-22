@@ -68,9 +68,12 @@ export const processVerifiedPaystackWebhook = action({
       status: v.string(),
       amount: v.number(),
       metadata: v.optional(v.object({
-        cartId: v.optional(v.string()),
-        userId: v.optional(v.string()),
-        orderId: v.optional(v.id("orders")), // Expecting Convex Order ID
+        // Accept either orderId OR cartId
+        orderId: v.optional(v.id("orders")), // Expecting Convex Order ID for regular orders
+        cartId: v.optional(v.id("sharedCarts")), // Expecting Convex Shared Cart ID for group orders
+        userId: v.optional(v.string()), // User who paid (relevant for shared carts)
+        cancel_action: v.optional(v.string()), // Add optional cancel_action
+        referrer: v.optional(v.string()) // Add optional referrer
       })),
       customer: v.object({
         email: v.string(),
@@ -89,35 +92,61 @@ export const processVerifiedPaystackWebhook = action({
     // Handle successful charge event
     if (args.event === "charge.success" && args.verifiedData.status === "success") {
       const orderId = args.verifiedData.metadata?.orderId;
+      const cartId = args.verifiedData.metadata?.cartId;
+      const userId = args.verifiedData.metadata?.userId; // User who made the payment
+      const reference = args.verifiedData.reference;
+      const amountPaid = args.verifiedData.amount;
 
-      if (!orderId) {
-        console.error(`Webhook Action: Missing orderId in metadata for Paystack reference: ${args.verifiedData.reference}`);
+      if (orderId) {
+        // --- Handle Regular Order Payment --- 
+        console.log(`Webhook Action: Handling payment for regular order ${orderId}.`);
+        try {
+          // Update order status and include payment reference
+          await ctx.runMutation(internal.orders.internalUpdateOrderStatusFromWebhook, {
+            orderId: orderId,
+            status: "Received", // Or map based on Paystack status if needed
+            paymentReference: reference, // Add the payment reference here
+          });
+          console.log(`Webhook Action: Order ${orderId} status updated successfully.`);
+          return { success: true };
+        } catch (error) {
+          console.error(`Webhook Action: Failed to update order status for ${orderId}:`, error);
+          throw new Error(`Failed to update order status: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+      } else if (cartId && userId) {
+        // --- Handle Shared Cart Payment --- 
+        console.log(`Webhook Action: Handling payment for shared cart ${cartId} by user ${userId}.`);
+        try {
+          console.log(`Webhook Action: Updating shared cart ${cartId} member ${userId} status using internal mutation.`);
+          // Call the internal mutation to update the shared cart member's status
+          await ctx.runMutation(internal.sharedCarts.internalUpdateSharedCartPaymentStatus, {
+            cartId: cartId,
+            userId: userId,
+            paymentReference: reference,
+            amountPaid: amountPaid, // Pass amount paid for verification/logging
+          });
+          console.log(`Webhook Action: Shared cart ${cartId} member ${userId} status updated successfully.`);
+          return { success: true };
+        } catch (error) {
+          console.error(`Webhook Action: Failed to update shared cart status for cart ${cartId}, user ${userId}:`, error);
+          throw new Error(`Failed to update shared cart status: ${error instanceof Error ? error.message : String(error)}`);
+        }
+
+      } else {
+        // --- Handle Missing/Ambiguous Metadata --- 
+        console.error(`Webhook Action: Missing or ambiguous ID (orderId or cartId/userId) in metadata for Paystack reference: ${reference}`);
         // Decide if this is a critical error. Maybe log and return success to Paystack?
-        // throw new Error("Missing orderId in webhook metadata");
-        return { success: false, message: "Missing orderId" };
+        // Returning success to avoid Paystack retries for potentially malformed but successful payments.
+        return { success: false, message: "Missing or ambiguous orderId/cartId in webhook metadata" };
       }
 
-      try {
-        console.log(`Webhook Action: Updating order ${orderId} status to 'Received' using internal mutation.`);
-        // Update the order status in Convex using the internal mutation
-        await ctx.runMutation(internal.orders.internalUpdateOrderStatusFromWebhook, {
-          orderId: orderId,
-          status: "Received", // Set status to 'Received' on successful payment
-        });
-        console.log(`Webhook Action: Order ${orderId} status updated successfully.`);
-        return { success: true };
-      } catch (error) {
-        console.error(`Webhook Action: Failed to update order status for ${orderId}:`, error);
-        // Decide how to handle mutation failure. Retry? Log?
-        // Throwing error here might cause Paystack to retry the webhook.
-        throw new Error(`Failed to update order status: ${error instanceof Error ? error.message : String(error)}`);
-      }
     } else {
       console.log(`Webhook Action: Received event ${args.event} with status ${args.verifiedData.status}. No action taken.`);
-      // Handle other events or statuses if needed
+      // Handle other events or statuses if needed (e.g., charge.failed)
     }
 
     // Acknowledge receipt to Paystack even if no action was taken for this event type
-    return { success: true, message: "Event received, no action needed." };
+    return { success: true, message: "Event received, no specific action needed for this event/status." };
   },
 });

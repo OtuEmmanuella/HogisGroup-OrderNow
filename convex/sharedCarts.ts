@@ -272,183 +272,71 @@ export const setPaymentMode = mutation({
   },
 });
 
+// --- Internal Mutations ---
+
 /**
- * Initiates the payment process for a shared cart in 'split' mode.
- * Calculates amount due per member and updates cart status.
- * Only callable by a member of the cart.
- * TODO: Integrate with Paystack initiation logic.
+ * INTERNAL: Updates the payment status for a specific member in a shared cart.
+ * Called by the Paystack webhook action after successful payment verification.
  */
-export const startSplitPayment = mutation({
+export const internalUpdateSharedCartPaymentStatus = internalMutation({
   args: {
     cartId: v.id("sharedCarts"),
+    userId: v.string(), // Clerk User ID of the member who paid
+    paymentReference: v.string(),
+    amountPaid: v.number(), // Amount paid in kobo/cents
   },
-  handler: async (ctx, args) => {
-    const user = await getUserFromAuth(ctx);
-    if (!user) {
-      throw new Error("Authentication required to start split payment.");
-    }
-    const cart = await ctx.db.get(args.cartId);
+  handler: async (ctx, { cartId, userId, paymentReference, amountPaid }) => {
+    console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Updating payment for user ${userId} in cart ${cartId}`);
 
-    if (!cart) throw new Error("Cart not found.");
-    // Allow proceeding if status is 'open' OR 'paying' (in case multiple users click)
-    if (cart.status !== "open" && cart.status !== "paying") {
-        throw new Error(`Cart status is '${cart.status}', cannot start payment.`);
-    }
-    if (cart.paymentMode !== "split") throw new Error("Cart is not in split payment mode.");
-
-    // Verify user is a member
+    // Find the specific member entry
     const member = await ctx.db
       .query("sharedCartMembers")
-      .withIndex("by_cart_user", (q) => q.eq("cartId", args.cartId).eq("userId", user.userId))
+      .withIndex("by_cart_user", (q) => q.eq("cartId", cartId).eq("userId", userId))
       .first();
-    if (!member) throw new Error("Access denied: You are not a member of this cart.");
 
-    // --- Amount Due Calculation Logic (Equal Split with Remainder Distribution) ---
-    const members = await ctx.db.query("sharedCartMembers").withIndex("by_cart", q => q.eq("cartId", args.cartId)).collect();
-    const totalAmount = cart.totalAmount; // Amount in kobo
-    const memberCount = members.length;
-    if (memberCount === 0) throw new Error("Cannot split payment with zero members.");
-
-    const baseAmountPerMember = Math.floor(totalAmount / memberCount);
-    let remainder = totalAmount % memberCount;
-
-    // Update amountDue for all members, distributing the remainder
-    for (let i = 0; i < members.length; i++) {
-      const member = members[i];
-      let amountDue = baseAmountPerMember;
-      if (remainder > 0) {
-        amountDue += 1; // Add one kobo from the remainder
-        remainder--;    // Decrement the remainder
-      }
-      // Patch each member individually
-      await ctx.db.patch(member._id, { amountDue: amountDue });
-    }
-    // --- End Calculation Logic ---
-
-    // Re-fetch the current user's member document AFTER the update loop to get the correct amountDue
-    const updatedCurrentUserMember = await ctx.db
-        .query("sharedCartMembers")
-        .withIndex("by_cart_user", (q) => q.eq("cartId", args.cartId).eq("userId", user.userId))
-        .first();
-
-    if (!updatedCurrentUserMember) {
-        // Should not happen if they were part of the members list before
-        throw new Error("Failed to refetch member details after update.");
+    if (!member) {
+      console.error(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Member ${userId} not found in cart ${cartId}.`);
+      // Decide how to handle: throw error? Log and continue?
+      // Throwing might cause webhook retries if the member *should* exist.
+      throw new Error(`Member ${userId} not found in cart ${cartId}`);
     }
 
-    const userAmountDue = updatedCurrentUserMember.amountDue;
-    if (userAmountDue === undefined || userAmountDue <= 0) {
-        // This might happen if calculation failed or total was zero
-        throw new Error("Could not determine a valid amount due for user.");
-    }
+    // Update the member's payment status and potentially store reference/amount
+    await ctx.db.patch(member._id, {
+      paymentStatus: "paid",
+      paymentReference: paymentReference, // Use the correct field name from schema
+      amountPaid: amountPaid, // Use the correct field name from schema
+      // Note: We might still need to reconcile amountPaid vs amountDue later
+    });
 
-    // Ensure user email is available for Paystack
-    if (!user.email) {
-        // Consider fetching from a user profile table if email isn't directly on identity
-        throw new Error("User email is required for payment initiation.");
-    }
+    console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Payment status for user ${userId} in cart ${cartId} updated to 'paid'.`);
 
-    // Return the necessary data for the frontend to call the Paystack action
-    return {
-        success: true,
-        status: "paying", // Confirm status changed
-        paymentData: {
-            cartId: args.cartId,
-            userId: user.userId,
-            email: user.email,
-            amountKobo: userAmountDue,
-        }
-     };
+    // TODO: Add logic here to check if ALL members have paid (if mode is 'split')
+    // or if the single payer has paid (if mode is 'payAll')
+    // If the cart is fully paid, trigger the order creation process.
+    // This might involve another internal mutation or action.
+    // Example check (needs refinement based on paymentMode):
+    // const cart = await ctx.db.get(cartId);
+    // if (cart && cart.paymentMode === 'split') {
+    //   const allMembers = await ctx.db.query("sharedCartMembers").withIndex("by_cart", q => q.eq("cartId", cartId)).collect();
+    //   const allPaid = allMembers.every(m => m.paymentStatus === 'paid');
+    //   if (allPaid) {
+    //     console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] All members in split cart ${cartId} have paid. Triggering order creation.`);
+    //     // await ctx.runMutation(internal.orders.createOrderFromSharedCart, { cartId });
+    //   }
+    // } else if (cart && cart.paymentMode === 'payAll') {
+    //    console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Single payer for cart ${cartId} has paid. Triggering order creation.`);
+    //    // await ctx.runMutation(internal.orders.createOrderFromSharedCart, { cartId });
+    // }
   },
 });
 
-/**
- * Initiates the payment process for a shared cart in 'payAll' mode.
- * Locks the cart status. Only callable by the initiator.
- * TODO: Integrate with Paystack initiation logic for the full amount.
- */
-export const startPayAll = mutation({
-  args: {
-    cartId: v.id("sharedCarts"),
-  },
-  handler: async (ctx, args) => {
-    const user = await getUserFromAuth(ctx);
-    if (!user) {
-      throw new Error("Authentication required to start pay-all.");
-    }
-    const cart = await ctx.db.get(args.cartId);
-
-    if (!cart) throw new Error("Cart not found.");
-    if (cart.status !== "open") throw new Error("Cart is not open for payment.");
-    if (cart.paymentMode !== "payAll") throw new Error("Cart is not in pay-all mode.");
-    if (cart.initiatorId !== user.userId) throw new Error("Only the initiator can pay for all.");
-
-    // Update cart status to 'locked' (prevents further changes/payments by others)
-    await ctx.db.patch(args.cartId, { status: "locked" });
-
-    // Ensure initiator email is available for Paystack
-    if (!user.email) {
-      // Consider fetching from a user profile table if email isn't directly on identity
-      throw new Error("Initiator email is required for payment initiation.");
-    }
-
-    // Return the necessary data for the frontend to call the Paystack action
-    return {
-        success: true,
-        status: "locked", // Confirm status changed
-        paymentData: {
-            cartId: args.cartId,
-            userId: user.userId, // Initiator's ID
-            email: user.email,   // Initiator's email
-            amountKobo: cart.totalAmount, // Full cart amount
-        }
-    };
-  },
-});
-
-/**
- * Cancels a shared cart (e.g., if the initiator decides to abandon it).
- * Only the cart initiator can cancel it.
- * Cart must NOT be in 'completed' status.
- */
-export const cancelSharedCart = mutation({
-    args: {
-        cartId: v.id("sharedCarts"),
-    },
-    handler: async (ctx, args) => {
-        const user = await getUserFromAuth(ctx);
-        if (!user) {
-            throw new Error("Authentication required to cancel a shared cart.");
-        }
-
-        const cart = await ctx.db.get(args.cartId);
-        if (!cart) {
-            throw new Error("Cart not found.");
-        }
-
-        if (cart.initiatorId !== user.userId) {
-            throw new Error("Only the cart initiator can cancel the cart.");
-        }
-
-        if (cart.status === "completed") {
-            throw new Error("Cannot cancel a completed cart.");
-        }
-
-        // Update the cart status to 'cancelled'
-        await ctx.db.patch(args.cartId, { status: "cancelled" });
-
-        // Optional: Clear cart items and members? Depends on your data model.
-        // For now, just set the status.
-
-        return { success: true };
-    },
-});
 
 // --- Queries ---
 
 /**
- * Gets the details of a specific shared cart, including members and items.
- * Requires the requesting user to be a member of the cart.
+ * Gets details of a specific shared cart, including members and items.
+ * Requires authenticated user who is a member of the cart.
  */
 export const getSharedCart = query({
   args: {
@@ -573,6 +461,146 @@ export const getUserSharedCarts = query({
     // TODO: Consider enriching cart data with member count or item count if needed for display.
 
     return activeCarts;
+  },
+});
+
+/**
+ * Initiates the split payment process for a shared cart.
+ * Only the cart initiator can start the payment.
+ * Cart must be in 'open' status and 'split' payment mode.
+ */
+export const startSplitPayment = mutation({
+  args: {
+    cartId: v.id("sharedCarts"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getUserFromAuth(ctx);
+    if (!user) {
+      throw new Error("Authentication required to start payment.");
+    }
+
+    const cart = await ctx.db.get(args.cartId);
+    if (!cart) {
+      throw new Error("Cart not found.");
+    }
+
+    if (cart.initiatorId !== user.userId) {
+      throw new Error("Only the initiator can start the payment process.");
+    }
+
+    if (cart.status !== "open") {
+      throw new Error("Cart must be open to start payment.");
+    }
+
+    if (cart.paymentMode !== "split") {
+      throw new Error("Cart is not in split payment mode.");
+    }
+
+    // Calculate total and amount due per member
+    const totalAmount = await calculateCartTotal(ctx.db, args.cartId);
+    const members = await ctx.db
+      .query("sharedCartMembers")
+      .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
+      .collect();
+
+    if (members.length === 0) {
+      throw new Error("Cannot start payment with no members in the cart.");
+    }
+
+    const amountDuePerMember = Math.ceil(totalAmount / members.length); // Round up to ensure total is covered
+
+    // Update cart status to 'paying' and member amounts
+    await ctx.db.patch(args.cartId, { status: "paying", totalAmount });
+    for (const member of members) {
+      await ctx.db.patch(member._id, { amountDue: amountDuePerMember });
+    }
+
+    console.log(`Split payment started for cart ${args.cartId}. Amount due per member: ${amountDuePerMember}`);
+    return { success: true, amountDuePerMember };
+  },
+});
+
+/**
+ * Initiates the 'Pay All' payment process for a shared cart.
+ * Only the cart initiator can start this.
+ * Cart must be in 'open' status and 'payAll' payment mode.
+ */
+export const startPayAll = mutation({
+  args: {
+    cartId: v.id("sharedCarts"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getUserFromAuth(ctx);
+    if (!user) {
+      throw new Error("Authentication required to start payment.");
+    }
+
+    const cart = await ctx.db.get(args.cartId);
+    if (!cart) {
+      throw new Error("Cart not found.");
+    }
+
+    if (cart.initiatorId !== user.userId) {
+      throw new Error("Only the initiator can start the payment process.");
+    }
+
+    if (cart.status !== "open") {
+      throw new Error("Cart must be open to start payment.");
+    }
+
+    if (cart.paymentMode !== "payAll") {
+      throw new Error("Cart is not in pay-all mode.");
+    }
+
+    // Calculate final total
+    const totalAmount = await calculateCartTotal(ctx.db, args.cartId);
+
+    // Update cart status to 'locked' (prevents further changes)
+    // The initiator will then trigger the actual payment transaction separately
+    await ctx.db.patch(args.cartId, { status: "locked", totalAmount });
+
+    console.log(`Pay-all process initiated for cart ${args.cartId}. Total: ${totalAmount}. Cart locked.`);
+    // Return the total amount so the initiator knows how much to pay
+    return { success: true, totalAmount };
+  },
+});
+
+/**
+ * Cancels a shared cart.
+ * Only the cart initiator can cancel.
+ * Cart must be in 'open', 'paying', or 'locked' status.
+ */
+export const cancelSharedCart = mutation({
+  args: {
+    cartId: v.id("sharedCarts"),
+  },
+  handler: async (ctx, args) => {
+    const user = await getUserFromAuth(ctx);
+    if (!user) {
+      throw new Error("Authentication required to cancel the cart.");
+    }
+
+    const cart = await ctx.db.get(args.cartId);
+    if (!cart) {
+      throw new Error("Cart not found.");
+    }
+
+    if (cart.initiatorId !== user.userId) {
+      throw new Error("Only the initiator can cancel the cart.");
+    }
+
+    if (!["open", "paying", "locked"].includes(cart.status)) {
+      throw new Error(`Cannot cancel a cart with status '${cart.status}'.`);
+    }
+
+    // Update cart status to 'cancelled'
+    await ctx.db.patch(args.cartId, { status: "cancelled" });
+
+    console.log(`Shared cart ${args.cartId} cancelled by initiator.`);
+    // TODO: Consider if any cleanup of members or items is needed, though likely not necessary
+    // TODO: Consider notifying members (e.g., via WebSocket or another mechanism)
+
+    return { success: true };
   },
 });
 

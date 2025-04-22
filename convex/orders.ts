@@ -67,15 +67,23 @@ export const internalUpdateOrderStatusFromWebhook = internalMutation({
       v.literal("Completed"),
       v.literal("Cancelled")
     ),
+    paymentReference: v.optional(v.string()), // Add optional paymentReference
   },
-  handler: async (ctx, { orderId, status }) => {
+  handler: async (ctx, { orderId, status, paymentReference }) => { // Destructure paymentReference
     const order = await ctx.db.get(orderId);
     if (!order) {
       console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order not found: ${orderId}`);
       throw new Error("Order not found");
     }
-    await ctx.db.patch(orderId, { status });
-    console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order ${orderId} status updated to ${status} by webhook.`);
+
+    // Prepare the patch object
+    const patchData: { status: typeof status, paymentReference?: string } = { status };
+    if (paymentReference !== undefined) {
+      patchData.paymentReference = paymentReference;
+    }
+
+    await ctx.db.patch(orderId, patchData);
+    console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order ${orderId} status updated to ${status}${paymentReference ? ` with payment ref ${paymentReference}` : ''} by webhook.`);
     // Optionally trigger other internal actions like notifications here
   },
 });
@@ -94,8 +102,9 @@ export const updateOrderStatus = mutation({
       v.literal("Completed"),
       v.literal("Cancelled")
     ),
+    paymentReference: v.optional(v.string()), // Add optional paymentReference
   },
-  handler: async (ctx, { orderId, status }) => {
+  handler: async (ctx, { orderId, status, paymentReference }) => { // Destructure paymentReference
     await ensureAdmin(ctx); // <-- Add auth check (Ensure only admins can update)
     const order = await ctx.db.get(orderId);
     if (!order) {

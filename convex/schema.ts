@@ -108,7 +108,8 @@ export default defineSchema({
     estimatedDeliveryTime: v.optional(v.number()), // Timestamp
     actualDeliveryTime: v.optional(v.number()), // Timestamp
     paymentMethod: v.optional(v.string()), // e.g., "Card", "Cash"
-    paymentTransactionId: v.optional(v.string()), // Reference from payment gateway
+    paymentTransactionId: v.optional(v.string()), // DEPRECATED? Use paystackReference
+    paymentReference: v.optional(v.string()), // Reference from payment gateway (e.g., Paystack)
     promoCode: v.optional(v.string()),
     taxAmount: v.optional(v.number()), // In kobo/cents
   })
@@ -216,7 +217,9 @@ export default defineSchema({
       v.literal("failed")     // Payment attempt failed
     ),
     amountDue: v.number(),    // Amount this member owes (kobo/cents) - calculated for split payment
-    paystackReference: v.optional(v.string()), // Reference if they paid
+    paymentReference: v.optional(v.string()), // Reference from payment gateway for this member's payment
+    amountPaid: v.optional(v.number()), // Actual amount paid by this member (kobo/cents)
+    paystackReference: v.optional(v.string()), // DEPRECATED? Keep for now if old data uses it, prefer paymentReference
     joinedAt: v.optional(v.number()), // Timestamp when user joined
     userEmail: v.optional(v.string()),
     userName: v.optional(v.string()),
