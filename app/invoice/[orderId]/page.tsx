@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Image from 'next/image';
-import logo from '@/images/logo.png'; // Assuming you have a logo
+import logo from '@/images/logo.webp'; // Assuming you have a logo
 import Link from 'next/link'; // Import Link
 
 const VAT_RATE = 0.075; // 7.5% VAT for Nigeria
