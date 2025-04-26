@@ -281,53 +281,78 @@ export const setPaymentMode = mutation({
 export const internalUpdateSharedCartPaymentStatus = internalMutation({
   args: {
     cartId: v.id("sharedCarts"),
-    userId: v.string(), // Clerk User ID of the member who paid
+    userId: v.string(),
     paymentReference: v.string(),
-    amountPaid: v.number(), // Amount paid in kobo/cents
+    amountPaid: v.number(),
   },
   handler: async (ctx, { cartId, userId, paymentReference, amountPaid }) => {
     console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Updating payment for user ${userId} in cart ${cartId}`);
 
-    // Find the specific member entry
+    // 1. Find the specific member entry
     const member = await ctx.db
       .query("sharedCartMembers")
       .withIndex("by_cart_user", (q) => q.eq("cartId", cartId).eq("userId", userId))
       .first();
 
     if (!member) {
-      console.error(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Member ${userId} not found in cart ${cartId}.`);
-      // Decide how to handle: throw error? Log and continue?
-      // Throwing might cause webhook retries if the member *should* exist.
+      console.error(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Member ${userId} not found in cart ${cartId}`);
       throw new Error(`Member ${userId} not found in cart ${cartId}`);
     }
 
-    // Update the member's payment status and potentially store reference/amount
+    // 2. Update the member's payment status and store payment details
     await ctx.db.patch(member._id, {
       paymentStatus: "paid",
-      paymentReference: paymentReference, // Use the correct field name from schema
-      amountPaid: amountPaid, // Use the correct field name from schema
-      // Note: We might still need to reconcile amountPaid vs amountDue later
+      paymentReference: paymentReference,
+      amountPaid: amountPaid,
     });
 
-    console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Payment status for user ${userId} in cart ${cartId} updated to 'paid'.`);
+    console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Payment status updated to 'paid' for user ${userId} in cart ${cartId}`);
 
-    // TODO: Add logic here to check if ALL members have paid (if mode is 'split')
-    // or if the single payer has paid (if mode is 'payAll')
-    // If the cart is fully paid, trigger the order creation process.
-    // This might involve another internal mutation or action.
-    // Example check (needs refinement based on paymentMode):
-    // const cart = await ctx.db.get(cartId);
-    // if (cart && cart.paymentMode === 'split') {
-    //   const allMembers = await ctx.db.query("sharedCartMembers").withIndex("by_cart", q => q.eq("cartId", cartId)).collect();
-    //   const allPaid = allMembers.every(m => m.paymentStatus === 'paid');
-    //   if (allPaid) {
-    //     console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] All members in split cart ${cartId} have paid. Triggering order creation.`);
-    //     // await ctx.runMutation(internal.orders.createOrderFromSharedCart, { cartId });
-    //   }
-    // } else if (cart && cart.paymentMode === 'payAll') {
-    //    console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Single payer for cart ${cartId} has paid. Triggering order creation.`);
-    //    // await ctx.runMutation(internal.orders.createOrderFromSharedCart, { cartId });
-    // }
+    // 3. Get the cart to check payment mode and current status
+    const cart = await ctx.db.get(cartId);
+    if (!cart) {
+      throw new Error(`Cart ${cartId} not found`);
+    }
+
+    // 4. Handle completion based on payment mode
+    if (cart.paymentMode === "split") {
+      // For split payment: check if all members have paid
+      const allMembers = await ctx.db
+        .query("sharedCartMembers")
+        .withIndex("by_cart", (q) => q.eq("cartId", cartId))
+        .collect();
+
+      const allPaid = allMembers.every((m) => m.paymentStatus === "paid");
+      
+      if (allPaid) {
+        console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] All members have paid in split cart ${cartId}. Marking as completed.`);
+        await ctx.db.patch(cartId, { status: "completed" });
+      }
+    } else if (cart.paymentMode === "payAll") {
+      // For pay-all: the cart is completed when the initiator pays
+      if (userId === cart.initiatorId) {
+        console.log(`[CONVEX internalM(sharedCarts:internalUpdatePaymentStatus)] Initiator has paid for cart ${cartId}. Marking as completed.`);
+        await ctx.db.patch(cartId, { status: "completed" });
+        
+        // Also mark all members as paid since initiator covered everything
+        const allMembers = await ctx.db
+          .query("sharedCartMembers")
+          .withIndex("by_cart", (q) => q.eq("cartId", cartId))
+          .collect();
+          
+        for (const m of allMembers) {
+          if (m.userId !== userId) { // Skip the initiator who already has a real payment record
+            await ctx.db.patch(m._id, {
+              paymentStatus: "paid",
+              paymentReference: `covered_by_${paymentReference}`,
+              amountPaid: 0 // They didn't actually pay anything
+            });
+          }
+        }
+      }
+    }
+
+    return { success: true };
   },
 });
 
@@ -390,11 +415,23 @@ export const getSharedCart = query({
     // Enrich items with menu item details
     const itemsWithDetails = await Promise.all(
       items.map(async (item) => {
-        const menuItem = await ctx.db.get(item.menuItemId);
+        let menuItem = null;
+        let name = "Unknown Item";
+        let imageUrl = undefined;
+        try {
+          menuItem = await ctx.db.get(item.menuItemId);
+          if (menuItem) {
+            name = menuItem.name ?? name;
+            imageUrl = menuItem.imageUrl;
+          }
+        } catch (error) {
+          console.error(`Error fetching menu item ${item.menuItemId} for cart ${args.cartId}:`, error);
+          // Keep default values
+        }
         return {
           ...item,
-          name: menuItem?.name ?? "Unknown Item",
-          imageUrl: menuItem?.imageUrl,
+          name: name,
+          imageUrl: imageUrl,
           // Add other menuItem fields if needed
         };
       })
@@ -403,16 +440,31 @@ export const getSharedCart = query({
     // Enrich members with user details (assuming a 'users' table indexed by Clerk's userId)
     const membersWithDetails = await Promise.all(
       members.map(async (member) => {
-        const userProfile = await ctx.db
-          .query("users")
-          .withIndex("by_user_id", (q) => q.eq("userId", member.userId))
-          .first(); // Assuming Clerk userId is unique in the users table
-        // Log the fetched profile to check for imageUrl
-        console.log(`Fetched profile for member ${member.userId}:`, userProfile);
+        let userProfile = null;
+        let name = "Unknown User";
+        let imageUrl = undefined;
+        try {
+          userProfile = await ctx.db
+            .query("users")
+            .withIndex("by_user_id", (q) => q.eq("userId", member.userId))
+            .first(); // Assuming Clerk userId is unique in the users table
+
+          if (userProfile) {
+            name = userProfile.name ?? name;
+            imageUrl = userProfile.imageUrl;
+            // Log the fetched profile to check for imageUrl
+            // console.log(`Fetched profile for member ${member.userId}:`, userProfile);
+          } else {
+            console.warn(`No user profile found for member ${member.userId} in cart ${args.cartId}`);
+          }
+        } catch (error) {
+            console.error(`Error fetching user profile for member ${member.userId} in cart ${args.cartId}:`, error);
+            // Keep default values
+        }
         return {
           ...member,
-          name: userProfile?.name ?? "Unknown User",
-          imageUrl: userProfile?.imageUrl, // Add imageUrl from the user profile
+          name: name,
+          imageUrl: imageUrl, // Add imageUrl from the user profile
         };
       })
     );

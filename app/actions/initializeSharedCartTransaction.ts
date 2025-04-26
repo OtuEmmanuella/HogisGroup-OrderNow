@@ -4,7 +4,6 @@ import { getConvexClient } from "@/lib/convex";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import baseUrl from "@/lib/baseUrl";
-// import { auth } from "@clerk/nextjs/server"; // Removed unused import
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
 const PAYSTACK_API_URL = "https://api.paystack.co";
@@ -30,24 +29,15 @@ interface InitializeSuccessData {
 
 export async function initializeSharedCartTransaction({
   cartId,
-  userId, // Clerk User ID of the person paying
-  email, // Email of the person paying
-  amountKobo, // Amount to charge (already calculated)
+  userId,
+  email,
+  amountKobo,
 }: {
   cartId: Id<"sharedCarts">;
   userId: string;
   email: string;
   amountKobo: number;
 }) {
-  // No need to re-authenticate here as userId is passed in
-  // const { userId: authUserId } = await auth();
-  // if (!authUserId || authUserId !== userId) throw new Error("User mismatch or not authenticated");
-
-  // Get shared cart details (optional, could rely on passed amount)
-  // Corrected function name from getSharedCartById to getSharedCart
-  const sharedCart = await convex.query(api.sharedCarts.getSharedCart, { cartId });
-  if (!sharedCart) throw new Error("Shared cart not found");
-
   // Validate amount
   if (typeof amountKobo !== 'number' || amountKobo <= 0) {
       throw new Error("Invalid payment amount.");
@@ -64,12 +54,11 @@ export async function initializeSharedCartTransaction({
   };
 
   const payload = {
-      email: email, // Use the provided email
-      amount: amountKobo, // Use the provided amount
+      email: email,
+      amount: amountKobo,
       currency: "NGN",
       callback_url: callbackUrl,
-      metadata: JSON.stringify(metadata),
-      // Add reference if you want to pre-generate one, otherwise Paystack generates
+      metadata, // Pass the metadata object directly, don't stringify
   };
 
   console.log("Initializing Paystack transaction via fetch for shared cart with payload:", payload);
@@ -81,7 +70,7 @@ export async function initializeSharedCartTransaction({
          Authorization: `Bearer ${PAYSTACK_SECRET_KEY}`,
          'Content-Type': 'application/json',
        },
-       body: JSON.stringify(payload),
+       body: JSON.stringify(payload), // The entire payload gets stringified here
      });
 
      console.log("Fetch Initialize Shared Cart Transaction Status Code:", response.status);
@@ -109,21 +98,6 @@ export async function initializeSharedCartTransaction({
     const data = responseData.data as InitializeSuccessData;
     console.log("Paystack shared cart transaction initialized successfully via fetch:", data.reference);
 
-    // Save the reference to the shared cart in Convex
-    try {
-        // TODO: Add a mutation in convex/sharedCarts.ts to store this reference
-        // Example: await convex.mutation(api.sharedCarts.addPaystackReference, {
-        //     cartId: cartId,
-        //     paystackReference: data.reference
-        // });
-        console.log(`Paystack reference ${data.reference} generated for shared cart ${cartId}. Need to store it.`);
-    } catch (updateError) {
-        console.error(`Failed to save Paystack reference to shared cart ${cartId}:`, updateError);
-        // Decide if this should be a fatal error
-        // throw new Error("Payment initialized but failed to update shared cart with payment reference. Please contact support.");
-    }
-
-    // Return only the URL needed by the frontend
     return data.authorization_url;
 
   } catch (error: unknown) {

@@ -68,82 +68,69 @@ export const processVerifiedPaystackWebhook = action({
       status: v.string(),
       amount: v.number(),
       metadata: v.optional(v.object({
-        // Accept either orderId OR cartId
-        orderId: v.optional(v.id("orders")), // Expecting Convex Order ID for regular orders
-        cartId: v.optional(v.id("sharedCarts")), // Expecting Convex Shared Cart ID for group orders
-        userId: v.optional(v.string()), // User who paid (relevant for shared carts)
-        cancel_action: v.optional(v.string()), // Add optional cancel_action
-        referrer: v.optional(v.string()) // Add optional referrer
+        orderId: v.optional(v.id("orders")),
+        cartId: v.optional(v.id("sharedCarts")),
+        userId: v.optional(v.string()),
+        cancel_action: v.optional(v.string()),
       })),
-      // Use v.any() for the entire customer object to accept any structure
       customer: v.any(),
     }),
   },
   handler: async (ctx, args) => {
-    console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Received webhook args: ${JSON.stringify(args, null, 2)}`); // Log entire args object
+    console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Received webhook args:`, args);
 
-    console.log(`Webhook Action: Processing verified Paystack event: ${args.event} for reference: ${args.verifiedData.reference}`);
-
-    // Handle successful charge event
     if (args.event === "charge.success" && args.verifiedData.status === "success") {
-      const orderId = args.verifiedData.metadata?.orderId;
-      const cartId = args.verifiedData.metadata?.cartId;
-      const userId = args.verifiedData.metadata?.userId; // User who made the payment
+      const { metadata } = args.verifiedData;
+      if (!metadata) {
+        console.error("No metadata in webhook payload");
+        return { success: false, message: "No metadata found in webhook" };
+      }
+
+      const orderId = metadata.orderId;
+      const cartId = metadata.cartId;
+      const userId = metadata.userId;
       const reference = args.verifiedData.reference;
       const amountPaid = args.verifiedData.amount;
 
-      console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Extracted Metadata - OrderID: ${orderId}, CartID: ${cartId}, UserID: ${userId}, Reference: ${reference}`); // Log extracted IDs
+      console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Processing payment - OrderID: ${orderId}, CartID: ${cartId}, UserID: ${userId}, Reference: ${reference}, Amount: ${amountPaid}`);
 
       if (orderId) {
         // --- Handle Regular Order Payment --- 
-        console.log(`Webhook Action: Handling payment for regular order ${orderId}.`);
+        console.log(`Webhook Action: Handling payment for regular order ${orderId}`);
         try {
-          // Update order status and include payment reference
           await ctx.runMutation(internal.orders.internalUpdateOrderStatusFromWebhook, {
             orderId: orderId,
-            status: "Received", // Or map based on Paystack status if needed
-            paymentReference: reference, // Add the payment reference here
+            status: "Received",
+            paymentReference: reference,
           });
-          console.log(`Webhook Action: Order ${orderId} status updated successfully.`);
+          console.log(`Webhook Action: Order ${orderId} status updated successfully`);
           return { success: true };
         } catch (error) {
           console.error(`Webhook Action: Failed to update order status for ${orderId}:`, error);
           throw new Error(`Failed to update order status: ${error instanceof Error ? error.message : String(error)}`);
         }
-
       } else if (cartId && userId) {
         // --- Handle Shared Cart Payment --- 
-        console.log(`Webhook Action: Handling payment for shared cart ${cartId} by user ${userId}.`);
+        console.log(`Webhook Action: Handling payment for shared cart ${cartId} by user ${userId}`);
         try {
-          console.log(`Webhook Action: Updating shared cart ${cartId} member ${userId} status using internal mutation.`);
-          // Call the internal mutation to update the shared cart member's status
           await ctx.runMutation(internal.sharedCarts.internalUpdateSharedCartPaymentStatus, {
             cartId: cartId,
             userId: userId,
             paymentReference: reference,
-            amountPaid: amountPaid, // Pass amount paid for verification/logging
+            amountPaid: amountPaid,
           });
-          console.log(`Webhook Action: Shared cart ${cartId} member ${userId} status updated successfully.`);
+          console.log(`Webhook Action: Shared cart ${cartId} member ${userId} payment status updated successfully`);
           return { success: true };
         } catch (error) {
           console.error(`Webhook Action: Failed to update shared cart status for cart ${cartId}, user ${userId}:`, error);
           throw new Error(`Failed to update shared cart status: ${error instanceof Error ? error.message : String(error)}`);
         }
-
       } else {
-        // --- Handle Missing/Ambiguous Metadata --- 
-        console.error(`Webhook Action: Missing or ambiguous ID (orderId or cartId/userId) in metadata for Paystack reference: ${reference}`);
-        // Decide if this is a critical error. Maybe log and return success to Paystack?
-        // Returning success to avoid Paystack retries for potentially malformed but successful payments.
-        return { success: false, message: "Missing or ambiguous orderId/cartId in webhook metadata" };
+        console.error(`Webhook Action: Missing or ambiguous ID (orderId or cartId/userId) in metadata for reference: ${reference}`);
+        return { success: false, message: "Missing or ambiguous metadata" };
       }
-
-    } else {
-      console.log(`Webhook Action: Received event ${args.event} with status ${args.verifiedData.status}. No action taken.`);
-      // Handle other events or statuses if needed (e.g., charge.failed)
     }
 
-    // Acknowledge receipt to Paystack even if no action was taken for this event type
-    return { success: true, message: "Event received, no specific action needed for this event/status." };
+    return { success: true, message: "Event processed" };
   },
 });
