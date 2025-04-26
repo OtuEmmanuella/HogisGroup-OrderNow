@@ -23,12 +23,12 @@ export default function SearchBar() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for dishes, drinks..."
-          className="w-full py-2.5 px-4 pl-11 bg-white/95 rounded-full border border-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#F96521] focus:border-transparent transition-all duration-200 text-sm md:text-base"
+          className="w-full py-2.5 px-4 pl-11 bg-white/95 rounded-full border border-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-[#bd3838] focus:border-transparent transition-all duration-200 text-sm md:text-base"
         />
         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 md:w-5 md:h-5" />
         <button
           type="submit"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#F96521] text-white px-3.5 py-1.5 rounded-full text-xs md:text-sm font-medium hover:bg-[#e05a19] transition-colors duration-200"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[#bd3838] text-white px-3.5 py-1.5 rounded-full text-xs md:text-sm font-medium hover:bg-[#e05a19] transition-colors duration-200"
         >
           Search
         </button>

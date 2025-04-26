@@ -122,7 +122,7 @@ export default function CartDrawer() {
             </div>
             <Button 
               asChild 
-              className="w-full bg-[#F96521] hover:bg-[#e05a19]"
+              className="w-full bg-[#bd3838] hover:bg-[#e05a19]"
               onClick={closeCartDrawer}
             >
               <Link href="/checkout">Proceed to Checkout</Link>

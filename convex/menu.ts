@@ -316,6 +316,10 @@ export const getMenuItems = query({
         includeUnavailable: v.optional(v.boolean()) // Add option to include unavailable items
     },
     handler: async (ctx, { categoryId, includeUnavailable }) => {
+        // Defensive: If categoryId is present but invalid, return []
+        if (categoryId === undefined || categoryId === null) {
+            return [];
+        }
 
         // If filtering by category AND availability, use the combined index
         if (categoryId && !includeUnavailable) {

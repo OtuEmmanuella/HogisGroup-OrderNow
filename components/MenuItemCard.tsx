@@ -92,6 +92,7 @@ function MenuItemCard({ item, onAddToCart, imageStorageId }: MenuItemCardProps) 
               onLoad={handleImageLoad}
               onError={handleImageError}
               unoptimized // Add this if you encounter issues with external URLs/storage providers
+              priority // Add priority hint
             />
           )}
           {imageError && !isImageLoading && (
@@ -105,7 +106,7 @@ function MenuItemCard({ item, onAddToCart, imageStorageId }: MenuItemCardProps) 
       <CardContent className="p-4 flex-grow">
         <CardTitle className="text-lg font-semibold mb-1 truncate">{item.name}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground mb-2 line-clamp-2">{item.description || 'No description available.'}</CardDescription>
-        <p className="text-lg font-bold text-primary">${item.price.toFixed(2)}</p>
+        <p className="text-lg font-bold text-primary">₦{item.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
       </CardContent>
       <CardFooter className="p-4 pt-0">
         <Button className="w-full" onClick={() => onAddToCart(item)} disabled={!item.isAvailable}>

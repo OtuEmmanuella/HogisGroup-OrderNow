@@ -3,7 +3,7 @@
 import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
-import logo from "@/images/logo.png";
+import logo from "@/images/logo.webp"
 import SearchBar from "./SearchBar";
 import { ShoppingBag, MapPin, Menu as MenuIcon, X, Users } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -46,7 +46,7 @@ function Header() {
   const changeLocationDisabled = !!activeSharedCartId; // Disable if in a shared cart
 
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-sm">
+    <header className="sticky top-0 z-50 bg-[#FDF9F1] shadow-sm">
       <div className="max-w-7xl mx-auto">
         {/* Main Header */}
         <div className="flex items-center justify-between px-4 py-3">

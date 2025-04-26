@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { Id } from '@/convex/_generated/dataModel';
 import Image from 'next/image';
-import logo from '@/images/logo.png';
+import logo from '@/images/logo.webp';
 import { useAuth } from '@clerk/nextjs';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
@@ -168,7 +168,7 @@ export default function StartOrderingPage() {
               />
             </motion.div>
 
-            <Image src={logo} alt="Hogis Logo" width={80} height={80} className="mb-6" />
+            <Image src={logo} alt="Hogis Logo" width={120} height={120} className="mb-4" />
             <h1 className="text-3xl md:text-4xl font-bold mb-3">Welcome to Hogis OrderNow</h1>
             <p className="text-muted-foreground mb-8 max-w-md">
               Ready for some delicious food? Let&apos;s get your order started quickly.
