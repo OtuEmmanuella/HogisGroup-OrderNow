@@ -6,25 +6,104 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
 import { format } from 'date-fns';
-import { Loader2, Printer, ArrowLeft } from 'lucide-react';
+import { Loader2, Printer, ArrowLeft, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import Image from 'next/image';
-import logo from '@/images/logo.webp'; // Assuming you have a logo
-import Link from 'next/link'; // Import Link
+import logo from '@/images/logo.webp';
+import Link from 'next/link';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
 const VAT_RATE = 0.075; // 7.5% VAT for Nigeria
 
-// Helper to format currency (assuming kobo/cents)
+// PDF styles
+const styles = StyleSheet.create({
+  page: { padding: 30 },
+  header: { marginBottom: 20 },
+  title: { fontSize: 24, marginBottom: 10 },
+  text: { fontSize: 12, marginBottom: 5 },
+  tableHeader: { backgroundColor: '#f3f4f6', padding: 8 },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#e5e7eb', padding: 8 },
+  col1: { width: '40%' },
+  col2: { width: '20%', textAlign: 'center' },
+  col3: { width: '20%', textAlign: 'right' },
+  col4: { width: '20%', textAlign: 'right' },
+  totalsSection: { marginTop: 20, alignItems: 'flex-end' },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
+  bold: { fontWeight: 'bold' },
+});
+
+// PDF Document Component
+const InvoicePDF = ({ data }: { data: any }) => (
+  <Document>
+    <Page size="A4" style={styles.page}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Invoice</Text>
+        <Text style={styles.text}>Order ID: #{data._id.slice(-8)}</Text>
+        <Text style={styles.text}>Date: {format(new Date(data._creationTime), 'PPP')}</Text>
+        <Text style={styles.text}>Branch: {data.branch?.name}</Text>
+      </View>
+
+      {/* Customer Info */}
+      <View style={{ marginBottom: 20 }}>
+        <Text style={styles.bold}>Bill To:</Text>
+        <Text style={styles.text}>{data.user?.name ?? 'Customer'}</Text>
+        <Text style={styles.text}>{data.user?.email ?? 'Email not available'}</Text>
+      </View>
+
+      {/* Items Table */}
+      <View>
+        <View style={[styles.tableRow, styles.tableHeader]}>
+          <Text style={styles.col1}>Item</Text>
+          <Text style={styles.col2}>Qty</Text>
+          <Text style={styles.col3}>Unit Price</Text>
+          <Text style={styles.col4}>Total</Text>
+        </View>
+        {data.items.map((item: any) => (
+          <View key={item._id} style={styles.tableRow}>
+            <Text style={styles.col1}>{item.name}</Text>
+            <Text style={styles.col2}>{item.quantity}</Text>
+            <Text style={styles.col3}>₦{(item.unitPrice / 100).toFixed(2)}</Text>
+            <Text style={styles.col4}>₦{(item.totalPrice / 100).toFixed(2)}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Totals */}
+      <View style={styles.totalsSection}>
+        <View style={styles.totalRow}>
+          <Text>Subtotal:</Text>
+          <Text>₦{(data.subTotal / 100).toFixed(2)}</Text>
+        </View>
+        {data.discountAmount > 0 && (
+          <View style={styles.totalRow}>
+            <Text>Discount:</Text>
+            <Text>-₦{(data.discountAmount / 100).toFixed(2)}</Text>
+          </View>
+        )}
+        <View style={styles.totalRow}>
+          <Text>VAT ({VAT_RATE * 100}%):</Text>
+          <Text>₦{((data.totalAmount / (1 + VAT_RATE)) * VAT_RATE / 100).toFixed(2)}</Text>
+        </View>
+        <View style={[styles.totalRow, styles.bold]}>
+          <Text>Total:</Text>
+          <Text>₦{(data.totalAmount / 100).toFixed(2)}</Text>
+        </View>
+      </View>
+    </Page>
+  </Document>
+);
+
+// Helper to format currency
 const formatCurrency = (amount?: number | null) => {
     if (amount === null || amount === undefined) return '₦--.--';
     return `₦${(amount / 100).toFixed(2)}`;
-}
+};
 
 export default function InvoicePage() {
     const params = useParams();
-    const router = useRouter(); // Hook for navigation
+    const router = useRouter();
     const orderId = params.orderId as Id<"orders">;
 
     const invoiceData = useQuery(api.orders.getInvoiceData, orderId ? { orderId } : 'skip');
@@ -61,7 +140,7 @@ export default function InvoicePage() {
     } = invoiceData;
 
     // Use pre-calculated totalAmount and derive VAT from it
-    const displayTotal = totalAmount; 
+    const displayTotal = totalAmount;
     const displayVAT = (totalAmount / (1 + VAT_RATE)) * VAT_RATE;
 
     return (
@@ -74,11 +153,27 @@ export default function InvoicePage() {
                 }
             `}</style>
 
-            {/* Back Button (No Print) */}
-            <div className="mb-4 no-print">
+            {/* Back Button and Actions (No Print) */}
+            <div className="flex justify-between items-center mb-4 no-print">
                 <Button variant="outline" size="sm" onClick={() => router.back()}>
                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handlePrint}>
+                        <Printer className="mr-2 h-4 w-4" /> Print
+                    </Button>
+                    <PDFDownloadLink
+                        document={<InvoicePDF data={invoiceData} />}
+                        fileName={`invoice-${_id.slice(-8)}.pdf`}
+                    >
+                        {({ loading }) => (
+                            <Button variant="outline" size="sm" disabled={loading}>
+                                <FileDown className="mr-2 h-4 w-4" />
+                                {loading ? 'Generating PDF...' : 'Download PDF'}
+                            </Button>
+                        )}
+                    </PDFDownloadLink>
+                </div>
             </div>
 
             {/* Header */}
@@ -94,9 +189,6 @@ export default function InvoicePage() {
                     <h2 className="text-lg font-semibold mb-1">{branch?.name ?? 'Hogis Branch'}</h2>
                     <p className="text-sm text-muted-foreground">{branch?.address ?? 'Address not available'}</p>
                     <p className="text-sm text-muted-foreground">{branch?.contactNumber ?? 'Contact not available'}</p>
-                    <Button onClick={handlePrint} size="sm" className="mt-4 no-print">
-                        <Printer className="mr-2 h-4 w-4" /> Print Invoice
-                    </Button>
                 </div>
             </div>
 
@@ -179,8 +271,8 @@ export default function InvoicePage() {
             {/* Notes */}
             {notes && (
                 <div className="mt-6 print:mt-4 pt-4 border-t">
-                     <h3 className="text-base font-semibold mb-2">Notes:</h3>
-                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">{notes}</p>
+                    <h3 className="text-base font-semibold mb-2">Notes:</h3>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{notes}</p>
                 </div>
             )}
 

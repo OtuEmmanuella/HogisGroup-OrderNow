@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { useQuery, useMutation } from 'convex/react'; // Import useMutation
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Doc, Id } from '@/convex/_generated/dataModel';
 import { Button } from '@/components/ui/button';
@@ -13,12 +13,12 @@ import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react'; // Import Loader2
-import { toast } from 'sonner'; // Import toast
-
+import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { PromoBanner } from "./PromoBanner";
 
-const MOBILE_PREVIEW_COUNT = 4;
+const MOBILE_PREVIEW_COUNT = 8;
 
 interface MenuItemCardProps {
   item: {
@@ -36,25 +36,35 @@ interface MenuItemCardProps {
 export function MenuItemCard({ item, onAddToCart, isAddingToCart }: MenuItemCardProps) {
   const displayPrice = item.price ? (item.price / 100).toFixed(2) : 'N/A';
   const imageUrl = item.imageUrl;
+  const [imageLoading, setImageLoading] = useState(true);
 
   return (
     <Card className={cn(
       "overflow-hidden flex flex-col h-full shadow-sm transition-shadow hover:shadow-md",
       !item.isAvailable && "opacity-60"
     )}>
-      <div className="relative w-full aspect-[4/3] bg-secondary">
+      <div className="relative w-full aspect-[4/3] bg-secondary overflow-hidden">
+        {imageLoading && (
+          <div className="absolute inset-0 z-10">
+            <Skeleton className="w-full h-full" />
+          </div>
+        )}
         {imageUrl ? (
           <Image
             src={imageUrl}
             alt={item.name}
             fill
-            className="object-cover"
+            className={cn(
+              "object-cover transition-opacity duration-300",
+              imageLoading ? "opacity-0" : "opacity-100"
+            )}
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw"
+            onLoadingComplete={() => setImageLoading(false)}
             onError={(e) => {
-              (e.target as HTMLImageElement).onerror = null;
-              (e.target as HTMLImageElement).src = '/images/placeholder-image.svg';
+              setImageLoading(false);
+              (e.target as HTMLImageElement).style.display = 'none';
             }}
-            priority={false}
+            loading="lazy"
           />
         ) : (
           <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">
@@ -78,7 +88,7 @@ export function MenuItemCard({ item, onAddToCart, isAddingToCart }: MenuItemCard
             size="sm"
             className="w-full text-xs"
             onClick={() => onAddToCart({_id: item._id, name: item.name, price: item.price})}
-            disabled={!item.isAvailable || isAddingToCart} // Disable if unavailable or adding
+            disabled={!item.isAvailable || isAddingToCart}
           >
             {isAddingToCart ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             {item.isAvailable ? (isAddingToCart ? 'Adding...' : 'Add to Cart') : 'Unavailable'}
@@ -93,29 +103,39 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart, isAddingTo
   categoryId: Id<'menuCategories'>;
   categoryName: string;
   onAddToCart: (item: { _id: Id<"menuItems">; name: string; price: number }) => void;
-  isAddingToCart: (itemId: Id<"menuItems">) => boolean; // Function to check loading state
+  isAddingToCart: (itemId: Id<"menuItems">) => boolean;
 }) {
   const items = useQuery(api.menu.getMenuItems, { categoryId, includeUnavailable: false });
   const [isExpanded, setIsExpanded] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
+  const [isInView, setIsInView] = useState(false);
+
+  // Different preview counts for mobile and desktop
+  const DESKTOP_PREVIEW_COUNT = 10;
+  const previewCount = isMobile ? MOBILE_PREVIEW_COUNT : DESKTOP_PREVIEW_COUNT;
 
   const itemsToDisplay = useMemo(() => {
     if (!items) return [];
-    if (isMobile && !isExpanded) {
-      return items.slice(0, MOBILE_PREVIEW_COUNT);
+    if (!isExpanded) {
+      return items.slice(0, previewCount);
     }
     return items;
-  }, [items, isMobile, isExpanded]);
+  }, [items, isExpanded, previewCount]);
 
-  const showExpandButton = isMobile && items && items.length > MOBILE_PREVIEW_COUNT;
+  const showExpandButton = items && items.length > previewCount;
 
+  // Loading state
   if (items === undefined) {
-    const skeletonCount = isMobile ? MOBILE_PREVIEW_COUNT : 4;
-    const layoutClasses = isMobile ? "flex space-x-3" : "grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4";
     return (
-      <div className={layoutClasses}>
-        {[...Array(skeletonCount)].map((_, i) => (
-           <Skeleton key={i} className="aspect-[4/3] w-full rounded-lg" />
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+        {[...Array(8)].map((_, i) => (
+          <div key={i} className="space-y-3">
+            <Skeleton className="aspect-[4/3] w-full rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          </div>
         ))}
       </div>
     );
@@ -130,57 +150,67 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart, isAddingTo
       <AnimatePresence initial={false}>
         <motion.div
           key={isExpanded ? "expanded" : "collapsed"}
-          initial={{ height: isMobile && !isExpanded ? 'auto' : 0, opacity: 0 }}
-          animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
           transition={{ duration: 0.3, ease: "easeInOut" }}
-          style={{ overflow: 'hidden' }}
         >
-          {isMobile && !isExpanded ? (
+          {isMobile ? (
             <ScrollArea className="w-full whitespace-nowrap rounded-md pb-2">
               <div className="flex space-x-3">
                 {itemsToDisplay.map((item) => (
                   <div key={item._id} className="w-40 flex-shrink-0">
-                      <MenuItemCard
-                        item={item}
-                        onAddToCart={onAddToCart}
-                        isAddingToCart={isAddingToCart(item._id)} // Pass loading state
-                      />
+                    <MenuItemCard
+                      item={item}
+                      onAddToCart={onAddToCart}
+                      isAddingToCart={isAddingToCart(item._id)}
+                    />
                   </div>
                 ))}
               </div>
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-              {items.map((item) => (
-                <MenuItemCard
-                  key={item._id}
-                  item={item}
-                  onAddToCart={onAddToCart}
-                  isAddingToCart={isAddingToCart(item._id)} // Pass loading state
-                />
-              ))}
-            </div>
+            <motion.div
+              initial={false}
+              animate={isExpanded ? { height: "auto" } : { height: "auto" }}
+              className="relative"
+            >
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                {itemsToDisplay.map((item) => (
+                  <MenuItemCard
+                    key={item._id}
+                    item={item}
+                    onAddToCart={onAddToCart}
+                    isAddingToCart={isAddingToCart(item._id)}
+                  />
+                ))}
+              </div>
+            </motion.div>
           )}
         </motion.div>
       </AnimatePresence>
 
       {showExpandButton && (
-        <div className="mt-3 text-center">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mt-3 text-center"
+        >
           <Button
             variant="outline"
             size="sm"
             onClick={() => setIsExpanded(!isExpanded)}
             aria-label={isExpanded ? `Show fewer items in ${categoryName}` : `Show all items in ${categoryName}`}
+            className="min-w-[120px]"
           >
             {isExpanded ? (
               <><ChevronUp className="mr-1 h-4 w-4" /> Show Less</>
             ) : (
-              <><ChevronDown className="mr-1 h-4 w-4" /> Show More</>
+              <><ChevronDown className="mr-1 h-4 w-4" /> Show {items.length - previewCount} More</>
             )}
           </Button>
-        </div>
+        </motion.div>
       )}
     </div>
   );
