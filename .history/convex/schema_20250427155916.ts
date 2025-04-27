@@ -16,8 +16,6 @@ export default defineSchema({
     contactNumber: v.optional(v.string()),
     isActive: v.optional(v.boolean()),
     minimumOrderAmount: v.optional(v.number()),
-    // Temporarily re-add deliveryZones as optional to allow push with old data
-    deliveryZones: v.optional(v.any()),
     // deliveryZones: v.optional(v.array( // Removed
     //   v.object({
     //     name: v.string(),

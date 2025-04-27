@@ -60,11 +60,11 @@ const AdminPromotionsPage = () => {
   const handleSeedZones = async () => {
     setIsSeeding(true);
     try {
-      const result = await seedZones(); // result type is { zonesAdded: number }
+      const result = await seedZones();
       console.log("Seeding result:", result);
       toast({
         title: "Seeding Successful",
-        description: `Successfully seeded ${result?.zonesAdded ?? 0} delivery zones.`,
+        description: `Successfully seeded ${result?.seededCount ?? 0} delivery zones.`,
         variant: "default",
       });
     } catch (error) {

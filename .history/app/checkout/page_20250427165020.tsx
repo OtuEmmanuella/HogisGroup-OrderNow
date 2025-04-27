@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOrderContext } from '@/context/OrderContext';
 import { useQuery, useMutation } from 'convex/react';
 // Remove useAction import if no longer needed, or keep if used elsewhere
@@ -18,7 +18,8 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
 import { Loader2, Tag, X, Slash } from 'lucide-react';
-import AddressForm, { type AddressFormData } from '@/components/AddressForm';
+import AddressForm from '@/components/AddressForm';
+import { type AddressFormData } from '@/components/AddressForm';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@clerk/nextjs';
 import { Input } from '@/components/ui/input';
@@ -44,7 +45,6 @@ import { type Id, type Doc } from '@/convex/_generated/dataModel';
 import { initializePaystackTransaction } from '@/app/actions/initializePaystackTransaction';
 import DeliveryZoneSelector from '@/components/DeliveryZoneSelector';
 // Removed problematic DeliveryZoneType import
-import { ValidatedPromo } from '@/convex/promotions';
 
 // Define proper interfaces to avoid using 'any'
 interface DeliveryAddress {
@@ -53,15 +53,6 @@ interface DeliveryAddress {
   recipientName?: string;
   recipientPhone?: string;
   // zoneName and deliveryFee removed as they are handled via deliveryZoneId
-}
-
-interface CartItem {
-  _id: Id<"menuItems">;
-  cartItemId?: string;
-  name: string;
-  price: number;
-  quantity: number;
-  // Add other fields as needed
 }
 
 interface OrderItemForPayload {
@@ -83,14 +74,12 @@ interface CreateOrderPayload {
   pickupTime?: number; // Timestamp, Only for Take-out
   dineInDateTime?: number; // Timestamp, Only for Dine-In
   dineInGuests?: number; // Only for Dine-In
-  dineInReservationType?: string; // Only for Dine-In
+  deliveryAddress?: DeliveryAddress;
+  pickupTime?: number;
+  dineInDateTime?: number;
+  dineInGuests?: number;
+  dineInReservationType?: string;
 }
-
-// Type for Paystack Action Result (adjust based on actual return type)
-// Assuming it might return error OR data based on linter feedback
-type PaystackResult = 
-  | { error: string; data?: never; authorizationUrl?: never }
-  | { error?: never; data?: { authorization_url: string; [key: string]: any }; authorizationUrl?: string; [key: string]: any };
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -104,7 +93,7 @@ export default function CheckoutPage() {
     // resetOrderFlow, // Removed as unused - keep if needed elsewhere
     // activeSharedCartId // Removed as unused - keep if needed elsewhere
     clearCart, // Assuming clearCart exists in context
-    // Removed setOrderDetails as it's not in context type
+    setOrderDetails // Assuming setOrderDetails exists for order confirmation page
   } = useOrderContext();
 
   const [deliveryAddress, setDeliveryAddress] = useState<AddressFormData | null>(null);
@@ -144,7 +133,7 @@ export default function CheckoutPage() {
     codeToValidate
       ? { code: codeToValidate, currentCartTotalKobo: Math.round(cartTotal * 100) }
       : 'skip'
-  ) as ValidatedPromo | undefined | null;
+  );
   const isPromoLoading = codeToValidate !== '' && validationResult === undefined;
 
   const handleApplyPromoCode = () => {
@@ -156,11 +145,11 @@ export default function CheckoutPage() {
     setCodeToValidate('');
   };
 
-  const appliedDiscountKobo =
+  const appliedDiscount =
     validationResult && 'promoId' in validationResult
       ? validationResult.calculatedDiscount
       : 0;
-  const finalTotalKobo = Math.max(0, Math.round(cartTotal * 100) - appliedDiscountKobo);
+  const finalTotalKobo = Math.max(0, Math.round(cartTotal * 100) - appliedDiscount);
   // No need for finalTotal in dollars here, work with kobo
   // const finalTotal = finalTotalKobo / 100;
 
@@ -170,7 +159,7 @@ export default function CheckoutPage() {
   const isUserLoading = !isUserLoaded;
   const isBranchLoading = !!selectedBranchId && branch === undefined;
   const isOrderContextMissing =
-    !selectedBranchId || !selectedOrderType || !cartItems || cartItems.length === 0;
+    !selectedBranchId || !selectedOrderType || cartItems.length === 0;
   const isLoadingPage = isUserLoading || isBranchLoading;
 
   const requiresAddress = selectedOrderType === 'Delivery';
@@ -184,7 +173,7 @@ export default function CheckoutPage() {
     selectedBranchId &&
     selectedOrderType &&
     customerName &&
-    cartItems && cartItems.length > 0 &&
+    cartItems.length > 0 &&
     branch &&
     !isPromoLoading &&
     (!requiresAddress || (deliveryAddress && selectedZoneId)) && // Ensure zone is selected for delivery
@@ -198,7 +187,7 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (isOrderContextMissing && !isLoadingPage) { // Check isLoadingPage to prevent premature redirect
       router.replace('/home');
-      toast({ title: "Missing Order Details", description: "Please select a branch, order type, and add items to your cart.", variant: "destructive" });
+      toast({ title: "Missing Order Details", description: "Please select a branch, order type, and add items to your cart.", variant: "warning" });
     }
   }, [isOrderContextMissing, isLoadingPage, router, toast]);
 
@@ -227,7 +216,7 @@ export default function CheckoutPage() {
        if (isPromoLoading) {
          description = 'Please wait for promo code validation to complete.';
        } else if (validationResult && 'error' in validationResult) {
-         description = `Please resolve the promo code issue: ${String(validationResult.error)}`;
+         description = `Please resolve the promo code issue: ${validationResult.error}`;
        } else if (!user) {
          description = 'Please ensure you are logged in.';
        } else if (requiresAddress && !deliveryAddress) {
@@ -240,8 +229,6 @@ export default function CheckoutPage() {
            description = 'Please fill in all dine-in details.';
        } else if (!customerName) {
             description = 'Please enter your name.';
-       } else if (!cartItems || cartItems.length === 0) {
-           description = 'Your cart is empty.';
        }
       toast({ title: 'Cannot Proceed', description, variant: 'destructive' });
       return;
@@ -292,8 +279,8 @@ export default function CheckoutPage() {
         branchId: selectedBranchId!,
         userId: user.id as Id<'users'>, // Use Clerk user ID directly if your backend expects it
         customerName,
-        items: cartItems.map((item: CartItem) => ({
-          menuItemId: item._id as Id<'menuItems'>, // Use item._id for menuItemId
+        items: cartItems.map((item) => ({
+          menuItemId: item.menuItemId, // Assuming cart item has menuItemId
           quantity: item.quantity,
           // Include price details if needed by backend, otherwise calculated there
         })),
@@ -322,48 +309,25 @@ export default function CheckoutPage() {
       console.log('Final total including delivery (kobo):', finalTotalWithDeliveryKobo);
 
       // 2. Initialize Paystack Transaction
-      const amountToPayKobo = finalTotalWithDeliveryKobo;
-      console.log('Initializing Paystack payment for', amountToPayKobo, 'Kobo');
-
-      // *** IMPORTANT: Verify the exact arguments required by your server action ***
-      // The linter suggests it only expects { orderId }, which seems incorrect.
-      // Keeping the full args commented out for reference.
-      /*
-      const paymentInputArgs = {
+      const paymentInitializationResult = await initializePaystackTransaction({
         email: user.primaryEmailAddress.emailAddress,
-        amount: amountToPayKobo,
+        amount: finalTotalWithDeliveryKobo, // Send amount in kobo
         metadata: {
-          orderId: orderId.toString(),
+          orderId: orderId, // Pass orderId in metadata
           userId: user.id,
           customerName: customerName,
           orderType: validatedOrderType,
-          cancel_action: `${window.location.origin}/checkout`
+          cancel_action: `${window.location.origin}/checkout` // Redirect back to checkout on cancel/failure
         },
-        callback_url: `${window.location.origin}/order-confirmation?orderId=${orderId.toString()}`
-      };
-      console.log("Paystack input:", paymentInputArgs);
-      */
+        callback_url: `${window.location.origin}/order-confirmation?orderId=${orderId}` // Redirect to confirmation on success
+      });
 
-      // FIXED: Passing only orderId based on linter error - VERIFY THIS!
-      const paymentInput = { orderId: orderId };
-      console.log("Paystack input (based on linter):", paymentInput);
-
-      // *** IMPORTANT: Verify the actual return type of your server action ***
-      // Casting to PaystackResult type based on combined linter feedback/assumptions
-      const paymentResult = await initializePaystackTransaction(paymentInput) as PaystackResult;
-      console.log("Paystack result:", paymentResult);
-
-      // Check for error first
-      if (paymentResult?.error) {
-          throw new Error(paymentResult.error);
+      if (paymentInitializationResult.error || !paymentInitializationResult.data) {
+        throw new Error(paymentInitializationResult.error || 'Failed to initialize Paystack transaction.');
       }
-      // FIXED: Check authorizationUrl directly on the result object (camelCase)
-      const authorizationUrl = paymentResult?.authorizationUrl; 
-      if (!authorizationUrl) {
-          throw new Error('Paystack authorization URL not found in the server action result. Verify action return type.');
-      }
-      
-      console.log('Redirecting to Paystack:', authorizationUrl);
+
+      // 3. Redirect user to Paystack
+      const authorizationUrl = paymentInitializationResult.data.authorization_url;
       router.push(authorizationUrl);
 
       // Clear cart *after* successfully redirecting to Paystack
@@ -486,23 +450,26 @@ export default function CheckoutPage() {
                 <CardContent>
                   <AddressForm
                     onSubmit={setDeliveryAddress}
+                    initialData={deliveryAddress || undefined} // Pass initial data if exists
                   />
                 </CardContent>
               </Card>
-              {/* Delivery Zone Selector should show as soon as order type is Delivery */}
-              <Card>
-                 <CardHeader>
-                    <CardTitle>Delivery Zone</CardTitle>
-                    <CardDescription>Select the zone for your delivery address.</CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                    <DeliveryZoneSelector
-                      selectedZoneId={selectedZoneId} // Pass selected ID
-                      isPeakHour={isPeakHour}        // Pass peak hour status
-                      onZoneSelect={handleZoneSelect} // Handle selection update
-                    />
-                 </CardContent>
-              </Card>
+              {/* Delivery Zone Selector - Conditional Rendering */}
+              {deliveryAddress && ( // Show only after address is entered? Or always if type is Delivery? Let's show always.
+                 <Card>
+                    <CardHeader>
+                       <CardTitle>Delivery Zone</CardTitle>
+                       <CardDescription>Select the zone for your delivery address.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <DeliveryZoneSelector
+                         selectedZoneId={selectedZoneId} // Pass selected ID
+                         isPeakHour={isPeakHour}        // Pass peak hour status
+                         onZoneSelect={handleZoneSelect} // Handle selection update
+                       />
+                    </CardContent>
+                 </Card>
+              )}
             </>
           )}
 
@@ -532,7 +499,7 @@ export default function CheckoutPage() {
               <CardContent className="space-y-4">
                 <div>
                    <Label htmlFor="dineInDate">Date</Label>
-                   <DatePicker onChange={(date) => setDineInDateTime(date)} />
+                   <DatePicker date={dineInDateTime} setDate={setDineInDateTime} />
                 </div>
                  <div>
                    <Label htmlFor="dineInTime">Time</Label>
@@ -586,16 +553,16 @@ export default function CheckoutPage() {
               <CardDescription>Order Type: {selectedOrderType}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {cartItems.map((item: CartItem) => (
-                <div key={item._id?.toString()} className="flex justify-between items-center">
-                  <span>{item.name || 'Item'} x {item.quantity || 1}</span>
-                  <span>{formatCurrency((item.price || 0) * (item.quantity || 1) * 100)}</span>
+              {cartItems.map((item) => (
+                <div key={item.cartItemId || item.menuItemId} className="flex justify-between items-center">
+                  <span>{item.name} x {item.quantity}</span>
+                  <span>{formatCurrency(item.price * item.quantity * 100)}</span> {/* Assume price is in Naira */}
                 </div>
               ))}
               <Separator />
               <div className="flex justify-between font-medium">
                 <span>Subtotal</span>
-                <span>{formatCurrency(Math.round(cartTotal * 100))}</span>
+                <span>{formatCurrency(cartTotal * 100)}</span>
               </div>
 
               {/* Promo Code Section */}
@@ -607,41 +574,45 @@ export default function CheckoutPage() {
                        placeholder="Enter code"
                        value={promoCodeInput}
                        onChange={(e) => setPromoCodeInput(e.target.value)}
-                       disabled={Boolean(!!codeToValidate && validationResult && 'promoId' in validationResult)}
+                       disabled={!!codeToValidate && validationResult && 'promoId' in validationResult} // Disable if valid code applied
                     />
-                    {(!codeToValidate || (validationResult && 'error' in validationResult)) && (
+                    {!codeToValidate && (
                        <Button onClick={handleApplyPromoCode} disabled={!promoCodeInput || isPromoLoading}>
                           {isPromoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
                        </Button>
                     )}
-                    {(codeToValidate || (validationResult && 'promoId' in validationResult)) && (
-                       <Button variant="ghost" size="icon" onClick={handleRemovePromoCode} disabled={isPromoLoading}>
+                    {codeToValidate && (
+                       <Button variant="ghost" size="icon" onClick={handleRemovePromoCode}>
                           <X className="h-4 w-4" />
                        </Button>
                     )}
                  </div>
                  {isPromoLoading && <p className="text-sm text-muted-foreground">Validating...</p>}
                  {validationResult && 'error' in validationResult && (
-                   <p className="text-sm text-red-600">Error: {String(validationResult.error)}</p>
+                   <p className="text-sm text-red-600">{validationResult.error}</p>
                  )}
                  {validationResult && 'promoId' in validationResult && (
                    <div className="text-sm text-green-600 flex items-center">
                       <Tag className="h-4 w-4 mr-1" />
-                      <span>Discount: -{formatCurrency(validationResult.calculatedDiscount)}</span>
+                      <span>
+                         Discount Applied: -{formatCurrency(validationResult.calculatedDiscount)} ({(validationResult.description)})
+                      </span>
                    </div>
                  )}
                </div>
+              {/* End Promo Code Section */}
 
               {selectedOrderType === 'Delivery' && (
                 <div className="flex justify-between">
                   <span>Delivery Fee</span>
-                  <span>{selectedZoneId ? formatCurrency(deliveryFee) : 'Select zone'}</span>
+                  <span>{deliveryFee > 0 ? formatCurrency(deliveryFee) : 'Select zone'}</span>
                 </div>
               )}
 
               <Separator />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
+                {/* Display final total based on order type */}
                 <span>
                    {selectedOrderType === 'Delivery'
                      ? formatCurrency(finalTotalWithDeliveryKobo)

@@ -489,20 +489,22 @@ export default function CheckoutPage() {
                   />
                 </CardContent>
               </Card>
-              {/* Delivery Zone Selector should show as soon as order type is Delivery */}
-              <Card>
-                 <CardHeader>
-                    <CardTitle>Delivery Zone</CardTitle>
-                    <CardDescription>Select the zone for your delivery address.</CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                    <DeliveryZoneSelector
-                      selectedZoneId={selectedZoneId} // Pass selected ID
-                      isPeakHour={isPeakHour}        // Pass peak hour status
-                      onZoneSelect={handleZoneSelect} // Handle selection update
-                    />
-                 </CardContent>
-              </Card>
+              {/* Delivery Zone Selector - Conditional Rendering */}
+              {deliveryAddress && ( // Show only after address is entered? Or always if type is Delivery? Let's show always.
+                 <Card>
+                    <CardHeader>
+                       <CardTitle>Delivery Zone</CardTitle>
+                       <CardDescription>Select the zone for your delivery address.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <DeliveryZoneSelector
+                         selectedZoneId={selectedZoneId} // Pass selected ID
+                         isPeakHour={isPeakHour}        // Pass peak hour status
+                         onZoneSelect={handleZoneSelect} // Handle selection update
+                       />
+                    </CardContent>
+                 </Card>
+              )}
             </>
           )}
 

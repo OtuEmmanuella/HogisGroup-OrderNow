@@ -8,7 +8,6 @@ import { PlusCircle, Loader2, X } from 'lucide-react';
 import PromotionsTable from '@/components/admin/PromotionsTable'; // Import the table
 import { Id, Doc } from '@/convex/_generated/dataModel';
 import PromotionForm from '@/components/admin/PromotionForm'; // Import the form
-import { useToast } from "@/hooks/use-toast"; // Import useToast
 
 // Define the Promotion type based on Convex Doc
 type Promotion = Doc<"promotions">;
@@ -16,14 +15,9 @@ type Promotion = Doc<"promotions">;
 const AdminPromotionsPage = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
-  const [isSeeding, setIsSeeding] = useState(false); // Add seeding state
-  const { toast } = useToast(); // Get toast function
-
   // Fetch promotions
   const promotions = useQuery(api.promotions.getAllPromotionsAdmin);
   const deletePromotion = useMutation(api.promotions.deletePromotion);
-  // Add seeding mutation
-  const seedZones = useMutation(api.deliveryZones.seedInitialDeliveryZones);
 
   const handleCreateNew = () => {
     setEditingPromotion(null); // Ensure we are creating, not editing
@@ -49,33 +43,13 @@ const AdminPromotionsPage = () => {
     }
     try {
       await deletePromotion({ promoId });
-      toast({ title: "Promotion Deleted", variant: "default" });
+      console.log('Promotion deleted:', promoId);
+      // Optional: Add toast notification for success
     } catch (error) {
       console.error('Failed to delete promotion:', error);
-      toast({ title: "Deletion Failed", description: error instanceof Error ? error.message : "Unknown error", variant: "destructive" });
-    }
-  };
-
-  // Seeding Handler
-  const handleSeedZones = async () => {
-    setIsSeeding(true);
-    try {
-      const result = await seedZones(); // result type is { zonesAdded: number }
-      console.log("Seeding result:", result);
-      toast({
-        title: "Seeding Successful",
-        description: `Successfully seeded ${result?.zonesAdded ?? 0} delivery zones.`,
-        variant: "default",
-      });
-    } catch (error) {
-      console.error("Failed to seed delivery zones:", error);
-      toast({
-        title: "Seeding Failed",
-        description: error instanceof Error ? error.message : "An unknown error occurred.",
-        variant: "destructive",
-      });
+      // Optional: Add toast notification for error
+      alert(`Error deleting promotion: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsSeeding(false);
     }
   };
 
@@ -83,19 +57,11 @@ const AdminPromotionsPage = () => {
 
   return (
     <div className="container mx-auto py-8 px-4 sm:px-6 lg:px-8">
-      <div className="flex justify-between items-center mb-6 gap-4 flex-wrap"> { /* Added flex-wrap and gap */}
+      <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Manage Promotions</h1>
-        <div className="flex gap-2"> { /* Group buttons */}
-          {/* Seed Button */}
-          <Button onClick={handleSeedZones} disabled={isLoading || isSeeding} variant="secondary">
-            {isSeeding ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            {isSeeding ? 'Seeding Zones...' : 'Seed Delivery Zones'}
-          </Button>
-          {/* Create Button */}
-          <Button onClick={handleCreateNew} disabled={isLoading}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Create New Promotion
-          </Button>
-        </div>
+        <Button onClick={handleCreateNew} disabled={isLoading}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Create New Promotion
+        </Button>
       </div>
 
       {isLoading ? (

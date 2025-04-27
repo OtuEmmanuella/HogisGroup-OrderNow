@@ -23,7 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@clerk/nextjs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { DatePicker } from '@/components/ui/datepicker';
+import { DatePicker, type DatePickerProps } from '@/components/ui/datepicker';
 import {
   Select,
   SelectContent,
@@ -227,7 +227,7 @@ export default function CheckoutPage() {
        if (isPromoLoading) {
          description = 'Please wait for promo code validation to complete.';
        } else if (validationResult && 'error' in validationResult) {
-         description = `Please resolve the promo code issue: ${String(validationResult.error)}`;
+         description = `Please resolve the promo code issue: ${validationResult.error}`;
        } else if (!user) {
          description = 'Please ensure you are logged in.';
        } else if (requiresAddress && !deliveryAddress) {
@@ -353,16 +353,17 @@ export default function CheckoutPage() {
       const paymentResult = await initializePaystackTransaction(paymentInput) as PaystackResult;
       console.log("Paystack result:", paymentResult);
 
-      // Check for error first
+      // FIXED: Check for error OR missing authorizationUrl based on PaystackResult type
       if (paymentResult?.error) {
           throw new Error(paymentResult.error);
       }
-      // FIXED: Check authorizationUrl directly on the result object (camelCase)
-      const authorizationUrl = paymentResult?.authorizationUrl; 
+      // Check URL in potential locations based on assumed type
+      const authorizationUrl = paymentResult?.data?.authorization_url || paymentResult?.authorization_url;
       if (!authorizationUrl) {
-          throw new Error('Paystack authorization URL not found in the server action result. Verify action return type.');
+          throw new Error('Failed to get Paystack authorization URL from the server action result.');
       }
       
+      // 3. Redirect user to Paystack
       console.log('Redirecting to Paystack:', authorizationUrl);
       router.push(authorizationUrl);
 
@@ -489,20 +490,22 @@ export default function CheckoutPage() {
                   />
                 </CardContent>
               </Card>
-              {/* Delivery Zone Selector should show as soon as order type is Delivery */}
-              <Card>
-                 <CardHeader>
-                    <CardTitle>Delivery Zone</CardTitle>
-                    <CardDescription>Select the zone for your delivery address.</CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                    <DeliveryZoneSelector
-                      selectedZoneId={selectedZoneId} // Pass selected ID
-                      isPeakHour={isPeakHour}        // Pass peak hour status
-                      onZoneSelect={handleZoneSelect} // Handle selection update
-                    />
-                 </CardContent>
-              </Card>
+              {/* Delivery Zone Selector - Conditional Rendering */}
+              {deliveryAddress && ( // Show only after address is entered? Or always if type is Delivery? Let's show always.
+                 <Card>
+                    <CardHeader>
+                       <CardTitle>Delivery Zone</CardTitle>
+                       <CardDescription>Select the zone for your delivery address.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <DeliveryZoneSelector
+                         selectedZoneId={selectedZoneId} // Pass selected ID
+                         isPeakHour={isPeakHour}        // Pass peak hour status
+                         onZoneSelect={handleZoneSelect} // Handle selection update
+                       />
+                    </CardContent>
+                 </Card>
+              )}
             </>
           )}
 
@@ -532,7 +535,7 @@ export default function CheckoutPage() {
               <CardContent className="space-y-4">
                 <div>
                    <Label htmlFor="dineInDate">Date</Label>
-                   <DatePicker onChange={(date) => setDineInDateTime(date)} />
+                   <DatePicker />
                 </div>
                  <div>
                    <Label htmlFor="dineInTime">Time</Label>
@@ -607,7 +610,7 @@ export default function CheckoutPage() {
                        placeholder="Enter code"
                        value={promoCodeInput}
                        onChange={(e) => setPromoCodeInput(e.target.value)}
-                       disabled={Boolean(!!codeToValidate && validationResult && 'promoId' in validationResult)}
+                       disabled={!!codeToValidate && validationResult && 'promoId' in validationResult}
                     />
                     {(!codeToValidate || (validationResult && 'error' in validationResult)) && (
                        <Button onClick={handleApplyPromoCode} disabled={!promoCodeInput || isPromoLoading}>
@@ -622,7 +625,7 @@ export default function CheckoutPage() {
                  </div>
                  {isPromoLoading && <p className="text-sm text-muted-foreground">Validating...</p>}
                  {validationResult && 'error' in validationResult && (
-                   <p className="text-sm text-red-600">Error: {String(validationResult.error)}</p>
+                   <p className="text-sm text-red-600">Error: {validationResult.error}</p>
                  )}
                  {validationResult && 'promoId' in validationResult && (
                    <div className="text-sm text-green-600 flex items-center">

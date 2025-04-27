@@ -353,16 +353,17 @@ export default function CheckoutPage() {
       const paymentResult = await initializePaystackTransaction(paymentInput) as PaystackResult;
       console.log("Paystack result:", paymentResult);
 
-      // Check for error first
+      // FIXED: Check for error OR missing authorizationUrl based on PaystackResult type
       if (paymentResult?.error) {
           throw new Error(paymentResult.error);
       }
-      // FIXED: Check authorizationUrl directly on the result object (camelCase)
-      const authorizationUrl = paymentResult?.authorizationUrl; 
+      // Check URL in potential locations based on assumed type
+      const authorizationUrl = paymentResult?.data?.authorization_url || paymentResult?.authorization_url;
       if (!authorizationUrl) {
-          throw new Error('Paystack authorization URL not found in the server action result. Verify action return type.');
+          throw new Error('Failed to get Paystack authorization URL from the server action result.');
       }
       
+      // 3. Redirect user to Paystack
       console.log('Redirecting to Paystack:', authorizationUrl);
       router.push(authorizationUrl);
 
@@ -489,20 +490,22 @@ export default function CheckoutPage() {
                   />
                 </CardContent>
               </Card>
-              {/* Delivery Zone Selector should show as soon as order type is Delivery */}
-              <Card>
-                 <CardHeader>
-                    <CardTitle>Delivery Zone</CardTitle>
-                    <CardDescription>Select the zone for your delivery address.</CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                    <DeliveryZoneSelector
-                      selectedZoneId={selectedZoneId} // Pass selected ID
-                      isPeakHour={isPeakHour}        // Pass peak hour status
-                      onZoneSelect={handleZoneSelect} // Handle selection update
-                    />
-                 </CardContent>
-              </Card>
+              {/* Delivery Zone Selector - Conditional Rendering */}
+              {deliveryAddress && ( // Show only after address is entered? Or always if type is Delivery? Let's show always.
+                 <Card>
+                    <CardHeader>
+                       <CardTitle>Delivery Zone</CardTitle>
+                       <CardDescription>Select the zone for your delivery address.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                       <DeliveryZoneSelector
+                         selectedZoneId={selectedZoneId} // Pass selected ID
+                         isPeakHour={isPeakHour}        // Pass peak hour status
+                         onZoneSelect={handleZoneSelect} // Handle selection update
+                       />
+                    </CardContent>
+                 </Card>
+              )}
             </>
           )}
 

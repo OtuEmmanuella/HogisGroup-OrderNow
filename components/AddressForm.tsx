@@ -21,39 +21,40 @@ import { Switch } from '@/components/ui/switch';
 const nigerianPhoneRegex = /^(?:0|\+234)[789]\d{9}$/;
 const phoneValidationMessage = 'Must be a valid Nigerian number (+234xxxxxxxxxx)';
 
-const addressSchema = z
-  .object({
-    street: z.string().min(3, { message: 'Street address must be at least 3 characters.' }),
-    customerPhone: z.string().regex(nigerianPhoneRegex, { message: phoneValidationMessage }),
-    isOrderingForSomeoneElse: z.boolean().default(false),
-    recipientName: z.string().optional(),
-    recipientPhone: z.string().optional(),
-  })
-  .refine(
-    (data) => {
-      if (data.isOrderingForSomeoneElse) {
-        return !!data.recipientName && data.recipientName.length >= 2 && !!data.recipientPhone;
-      }
-      return true;
-    },
-    {
-      message:
-        'Recipient name (min 2 chars) and phone number are required when ordering for someone else.',
-      path: ['recipientName'],
+export const addressSchema = z.object({
+  street: z.string().min(5, { message: "Address must be at least 5 characters." }),
+  customerPhone: z.string().regex(nigerianPhoneRegex, { message: phoneValidationMessage }),
+  isOrderingForSomeoneElse: z.boolean().default(false),
+  recipientName: z.string().optional(),
+  recipientPhone: z.string().optional(),
+  zoneName: z.string().optional(),
+  deliveryFee: z.number().optional(),
+})
+.refine(
+  (data) => {
+    if (data.isOrderingForSomeoneElse) {
+      return !!data.recipientName && data.recipientName.length >= 2 && !!data.recipientPhone;
     }
-  )
-  .refine(
-    (data) => {
-      if (data.isOrderingForSomeoneElse && data.recipientPhone) {
-        return nigerianPhoneRegex.test(data.recipientPhone);
-      }
-      return true;
-    },
-    {
-      message: phoneValidationMessage,
-      path: ['recipientPhone'],
+    return true;
+  },
+  {
+    message:
+      'Recipient name (min 2 chars) and phone number are required when ordering for someone else.',
+    path: ['recipientName'],
+  }
+)
+.refine(
+  (data) => {
+    if (data.isOrderingForSomeoneElse && data.recipientPhone) {
+      return nigerianPhoneRegex.test(data.recipientPhone);
     }
-  );
+    return true;
+  },
+  {
+    message: phoneValidationMessage,
+    path: ['recipientPhone'],
+  }
+);
 
 export type AddressFormData = z.infer<typeof addressSchema>;
 

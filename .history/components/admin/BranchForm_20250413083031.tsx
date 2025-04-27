@@ -15,25 +15,50 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // For delivery zone
 import { Checkbox } from "@/components/ui/checkbox"; // For supported types
 import { OrderType } from '@/components/OrderTypeSelector'; // Import OrderType
 import { Id } from '@/convex/_generated/dataModel';
 
-// Zod schema for form validation - REMOVED deliveryZone
+// GeoJSON types
+type GeoJSONPolygon = {
+  type: 'Polygon';
+  coordinates: number[][][];
+};
+
+type GeoJSONMultiPolygon = {
+  type: 'MultiPolygon';
+  coordinates: number[][][][];
+};
+
+// Allow empty object for deliveryZone
+type DeliveryZone = GeoJSONPolygon | GeoJSONMultiPolygon | Record<string, never>;
+
+// Zod schema for form validation - should match convex/branches.ts args
 const branchFormSchema = z.object({
   name: z.string().min(3, { message: "Branch name must be at least 3 characters." }),
   address: z.string().min(5, { message: "Address must be at least 5 characters." }),
   contactNumber: z.string().min(5, { message: "Contact number must be at least 5 characters." }),
-  operatingHours: z.string().min(5, { message: "Operating hours must be specified." }),
+  operatingHours: z.string().min(5, { message: "Operating hours must be specified." }), // Example: "Mon-Fri 9am-10pm, Sat-Sun 11am-11pm"
   supportedOrderTypes: z.array(z.enum(["Delivery", "Dine-In", "Take-out"])).min(1, {
     message: "At least one order type must be supported.",
   }),
+  deliveryZone: z.string().optional().refine(val => {
+    if (!val || val.trim() === '') return true; // Allow empty
+    try {
+      const parsed = JSON.parse(val);
+      return parsed.type === 'Polygon' || parsed.type === 'MultiPolygon';
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) { // Using underscore and disabling eslint rule
+      return false;
+    }
+  }, { message: "Delivery zone must be valid GeoJSON Polygon or MultiPolygon (or empty)." }),
   isActive: z.boolean().default(true),
 });
 
 export type BranchFormData = z.infer<typeof branchFormSchema>;
 
-// Update Branch type to match Convex schema - REMOVED deliveryZone
+// Update Branch type to match Convex schema
 export type Branch = {
   _id: Id<"branches">;
   _creationTime: number;
@@ -43,11 +68,13 @@ export type Branch = {
   supportedOrderTypes: ("Delivery" | "Dine-In" | "Take-out")[];
   contactNumber?: string;
   isActive?: boolean;
+  deliveryZone?: DeliveryZone;
   minimumOrderAmount?: number;
+  deliveryFee?: number;
 };
 
 interface BranchFormProps {
-  onSubmit: (data: BranchFormData) => Promise<void>; 
+  onSubmit: (data: BranchFormData) => Promise<void>; // Make async to handle mutation state
   isLoading: boolean;
   defaultValues?: Partial<BranchFormData>;
   submitButtonText?: string;
@@ -70,12 +97,13 @@ export default function BranchForm({
       contactNumber: '',
       operatingHours: '',
       supportedOrderTypes: [],
+      deliveryZone: '',
       isActive: true,
     },
   });
 
   async function handleFormSubmit(values: BranchFormData) {
-    console.log("Branch form submitted (without deliveryZone):", values);
+    console.log("Branch form submitted:", values);
     await onSubmit(values); 
   }
 
@@ -141,7 +169,7 @@ export default function BranchForm({
         <FormField
           control={form.control}
           name="supportedOrderTypes"
-          render={() => (
+          render={() => ( // Removed unused field parameter
             <FormItem>
               <div className="mb-4">
                 <FormLabel className="text-base">Supported Order Types</FormLabel>
@@ -191,6 +219,32 @@ export default function BranchForm({
 
         <FormField
           control={form.control}
+          name="deliveryZone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Delivery Zone (GeoJSON)</FormLabel>
+              <FormControl>
+                <Textarea
+                  placeholder='{
+  "type": "Polygon",
+  "coordinates": [[ [-122.4, 37.8], [-122.5, 37.8], [-122.5, 37.7], [-122.4, 37.7], [-122.4, 37.8] ]]
+}'
+                  className="min-h-[150px] font-mono text-sm"
+                  {...field}
+                  value={field.value ?? ''} 
+                />
+              </FormControl>
+              <FormDescription>
+                Paste a valid GeoJSON Polygon or MultiPolygon definition, or leave empty.
+                Use tools like geojson.io to create one.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
           name="isActive"
           render={({ field }) => (
             <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
@@ -201,11 +255,9 @@ export default function BranchForm({
                 />
               </FormControl>
               <div className="space-y-1 leading-none">
-                <FormLabel>
-                  Active Branch
-                </FormLabel>
+                <FormLabel>Active Branch</FormLabel>
                 <FormDescription>
-                  Uncheck this to temporarily disable this branch from appearing to customers.
+                  Only active branches will be shown to customers and accept orders.
                 </FormDescription>
               </div>
             </FormItem>

@@ -13,6 +13,7 @@ import type * as branches from "../branches.js";
 import type * as clerk from "../clerk.js";
 import type * as constants from "../constants.js";
 import type * as crons from "../crons.js";
+import type * as deliveryZones from "../deliveryZones.js";
 import type * as email from "../email.js";
 import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   clerk: typeof clerk;
   constants: typeof constants;
   crons: typeof crons;
+  deliveryZones: typeof deliveryZones;
   email: typeof email;
   feedback: typeof feedback;
   files: typeof files;

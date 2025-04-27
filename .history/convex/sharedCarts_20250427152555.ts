@@ -8,7 +8,7 @@ import {
   MutationCtx,
   QueryCtx,
 } from "./_generated/server";
-import { Id, Doc } from "./_generated/dataModel";
+import { Id } from "./_generated/dataModel";
 import { getUserFromAuth } from "./lib/getUserFromAuth"; // Helper to get Clerk user
 import { api } from "./_generated/api"; // Import the generated API object
 
@@ -51,29 +51,17 @@ export const createSharedCart = mutation({
     let deliveryZone: Doc<"deliveryZones"> | null = null;
     if (args.orderType === 'Delivery') {
       if (!args.deliveryZoneId) {
-        // This validation ensures initiator provides zone for delivery orders
         throw new Error("Delivery zone ID is required for delivery shared carts.");
       }
       deliveryZone = await ctx.db.get(args.deliveryZoneId);
       if (!deliveryZone || !deliveryZone.isActive) {
         throw new Error("Selected delivery zone is not valid or inactive.");
       }
-      
-      // --- Peak Hour Logic --- 
-      const now = new Date(); // Use server time (likely UTC in Convex env)
-      const currentHour = now.getHours(); // Get hour (0-23) in the server's timezone (UTC)
-      // Define Peak Hours (e.g., 6 PM to 9 PM UTC -> hours 18, 19, 20)
-      const peakStartHour = 18;
-      const peakEndHour = 21; // End hour is exclusive (up to 20:59:59)
-      const isPeak = currentHour >= peakStartHour && currentHour < peakEndHour;
-
-      // Select the correct fee based on peak hour status
-      deliveryFee = isPeak ? deliveryZone.peakFee : deliveryZone.baseFee;
-      console.log(`[CONVEX M(sharedCarts:create)] Current Hour (UTC): ${currentHour}, Is Peak: ${isPeak}, Selected Fee: ${deliveryFee}`);
-      // --- End Peak Hour Logic --- 
-      
-      // Note: Delivery fee is stored on the cart but not added to the cart's item totalAmount.
-      // It will be handled separately during payment.
+      // TODO: Implement peak hour logic here
+      deliveryFee = deliveryZone.baseFee;
+      console.log(`[CONVEX M(sharedCarts:create)] Delivery Zone: ${deliveryZone.name}, Fee: ${deliveryFee}`);
+      // Note: Delivery fee is NOT added to the cart's totalAmount here.
+      // totalAmount represents the sum of item prices. Delivery fee is separate.
     }
 
     const inviteCode = nanoid(8); // Generate a short, unique invite code
@@ -89,7 +77,7 @@ export const createSharedCart = mutation({
       createdAt: Date.now(),
       // Add delivery details if applicable
       ...(args.orderType === 'Delivery' && {
-        deliveryZoneId: args.deliveryZoneId!, // Assert non-null due to check above
+        deliveryZoneId: args.deliveryZoneId!,
         deliveryFee: deliveryFee, // Store the calculated fee
       }),
     });

@@ -12,13 +12,11 @@ import { api } from '@/convex/_generated/api';
 
 // Define a proper MenuItem interface
 export interface MenuItem {
-  // Assuming your item from Convex has _id instead of id
-  _id: Id<"menuItems">; 
+  id: string;
   name: string;
   description?: string;
-  price: number; // Assuming this is in KOBO from Convex
+  price: number;
   isAvailable: boolean;
-  imageStorageId?: Id<"_storage"> | null; // Include imageStorageId here
   // Add any other properties your menu item might have
 }
 
@@ -26,29 +24,14 @@ export interface MenuItem {
 export interface MenuItemCardProps {
   item: MenuItem;
   onAddToCart: (item: MenuItem) => void;
-  // imageStorageId is now part of the item prop
+  imageStorageId?: Id<"_storage"> | null;
 }
 
-// Helper function to format currency (same as in checkout)
-const formatCurrency = (amountKobo: number) => {
-  if (typeof amountKobo !== 'number' || isNaN(amountKobo)) {
-      console.warn("Invalid amount passed to formatCurrency:", amountKobo);
-      return "N/A"; // Return a placeholder or throw an error
-  }
-  return new Intl.NumberFormat('en-NG', {
-    style: 'currency',
-    currency: 'NGN',
-  }).format(amountKobo / 100); // Convert kobo to Naira
-};
-
 // Define the component function
-function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) { // Removed imageStorageId from props
+function MenuItemCard({ item, onAddToCart, imageStorageId }: MenuItemCardProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
-
-  // Use item.imageStorageId directly
-  const imageStorageId = item.imageStorageId;
 
   const maybeImageUrl = useQuery(
     api.files.getUrl, // Assuming you have this API endpoint
@@ -103,13 +86,13 @@ function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) { // Removed ima
             <Image
               src={imageUrl}
               alt={item.name}
-              fill // Use fill instead of layout="fill"
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" // Add sizes prop
-              style={{ objectFit: "cover" }} // Use style prop for objectFit
+              layout="fill"
+              objectFit="cover"
               className={`transition-opacity duration-300 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
               onLoad={handleImageLoad}
               onError={handleImageError}
-              priority // Keep priority hint
+              unoptimized // Add this if you encounter issues with external URLs/storage providers
+              priority // Add priority hint
             />
           )}
           {imageError && !isImageLoading && (
@@ -123,7 +106,7 @@ function MenuItemCard({ item, onAddToCart }: MenuItemCardProps) { // Removed ima
       <CardContent className="p-4 flex-grow">
         <CardTitle className="text-lg font-semibold mb-1 truncate">{item.name}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground mb-2 line-clamp-2">{item.description || 'No description available.'}</CardDescription>
-        <p className="text-lg font-bold text-primary">{formatCurrency(item.price)}</p>
+        <p className="text-lg font-bold text-primary">₦{item.price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</p>
       </CardContent>
       <CardFooter className="p-4 pt-0">
         <Button className="w-full" onClick={() => onAddToCart(item)} disabled={!item.isAvailable}>

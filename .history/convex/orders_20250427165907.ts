@@ -1,7 +1,7 @@
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { Id, Doc } from "./_generated/dataModel"; // Import Id and Doc
+import { Id } from "./_generated/dataModel"; // Import Id
 import { ensureAdmin, getUserFromAuth } from "./lib/auth"; // Import the helper
 
 // Fetch all orders for a specific user

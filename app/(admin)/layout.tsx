@@ -17,10 +17,10 @@ function AdminSidebar() {
       <nav className="flex flex-col space-y-2">
         <h2 className="text-lg font-semibold mb-4">Admin Menu</h2>
         <Button variant="ghost" className="justify-start" asChild>
-          <Link href="/(admin)/admin">Dashboard</Link>
+          <Link href="/admin">Dashboard</Link>
         </Button>
         <Button variant="ghost" className="justify-start" asChild>
-          <Link href="/(admin)/branches">Branches</Link>
+          <Link href="/admin/branches">Branches</Link>
         </Button>
         <Button variant="ghost" className="justify-start" asChild>
           <Link href="/admin/menu">Menu Management</Link>
@@ -34,7 +34,6 @@ function AdminSidebar() {
         <Button variant="ghost" className="justify-start" asChild>
           <Link href="/admin/insights">Insights</Link>
         </Button>
-        {/* Add more links as needed */}
       </nav>
     </aside>
   );
@@ -91,4 +90,4 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       </main>
     </div>
   );
-} 
+}

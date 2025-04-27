@@ -1,7 +1,7 @@
 import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
-import { Id, Doc } from "./_generated/dataModel"; // Import Id and Doc
+import { Id } from "./_generated/dataModel"; // Import Id
 import { ensureAdmin, getUserFromAuth } from "./lib/auth"; // Import the helper
 
 // Fetch all orders for a specific user
@@ -312,20 +312,9 @@ export const createOrder = mutation({
       if (!deliveryZone || !deliveryZone.isActive) {
         throw new Error("Selected delivery zone is not valid or inactive.");
       }
-      
-      // --- Peak Hour Logic --- 
-      const now = new Date(); // Use server time (likely UTC in Convex env)
-      const currentHour = now.getHours(); // Get hour (0-23) in the server's timezone (UTC)
-      // Define Peak Hours (e.g., 6 PM to 9 PM UTC -> hours 18, 19, 20)
-      const peakStartHour = 18;
-      const peakEndHour = 21; // End hour is exclusive (up to 20:59:59)
-      const isPeak = currentHour >= peakStartHour && currentHour < peakEndHour;
-
-      // Select the correct fee based on peak hour status
-      deliveryFee = isPeak ? deliveryZone.peakFee : deliveryZone.baseFee;
-      console.log(`[CONVEX M(orders:createOrder)] Current Hour (UTC): ${currentHour}, Is Peak: ${isPeak}, Selected Fee: ${deliveryFee}`);
-      // --- End Peak Hour Logic --- 
-      
+      // TODO: Implement peak hour logic here
+      // For now, just use baseFee
+      deliveryFee = deliveryZone.baseFee;
       finalAmount += deliveryFee; // Add delivery fee to the final amount
       console.log(`[CONVEX M(orders:createOrder)] Delivery Zone: ${deliveryZone.name}, Fee: ${deliveryFee}, New Total: ${finalAmount}`);
     }

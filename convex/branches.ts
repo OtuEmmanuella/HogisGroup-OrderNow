@@ -4,6 +4,14 @@ import { api } from "./_generated/api"; // Ensure api is imported if needed late
 import { Id, Doc } from "./_generated/dataModel";
 import { ensureAdmin } from "./lib/auth"; // Import the helper
 
+// Define DeliveryZone type (Removed - Now in deliveryZones.ts or schema)
+// export type DeliveryZone = {
+//   name: string;
+//   description: string;
+//   baseFee: number; // Fee in kobo/cents
+//   peakFee: number; // Fee in kobo/cents during peak hours
+// };
+
 // Query to list all available branches
 export const list = query({
   args: {},
@@ -22,6 +30,20 @@ export const getById = query({
   },
 });
 
+// Query to get delivery zones for a specific branch (Removed - Use deliveryZones.listActive)
+// export const getDeliveryZones = query({
+//   args: { branchId: v.id("branches") },
+//   handler: async (ctx, { branchId }) => {
+//     const branch = await ctx.db.get(branchId);
+//     if (!branch) {
+//       throw new Error("Branch not found");
+//     }
+//     // Return the deliveryZones array from the branch document
+//     // Ensure the return type matches the expected structure (array of DeliveryZone)
+//     return (branch.deliveryZones as DeliveryZone[] | undefined) ?? [];
+//   },
+// });
+
 // Define the shape for branch creation/update, matching schema
 const branchArgs = {
   name: v.string(),
@@ -31,10 +53,16 @@ const branchArgs = {
   supportedOrderTypes: v.array(
     v.union(v.literal("Delivery"), v.literal("Dine-In"), v.literal("Take-out"))
   ),
-  deliveryZone: v.optional(v.any()), // Expecting GeoJSON structure
   minimumOrderAmount: v.optional(v.number()),
-  deliveryFee: v.optional(v.number()),
   isActive: v.boolean(),
+  // deliveryZones: v.optional(v.array( // Removed
+  //   v.object({
+  //     name: v.string(),
+  //     description: v.string(),
+  //     baseFee: v.number(),
+  //     peakFee: v.number(),
+  //   })
+  // )), 
 };
 
 // Mutation to create a new branch
@@ -74,6 +102,7 @@ export const deleteBranch = mutation({
 // Define a type for the initial branch data matching insert requirements
 type InitialBranchData = Pick<Doc<"branches">, 
     "name" | "address" | "operatingHours" | "supportedOrderTypes" | "contactNumber" | "isActive"
+    // Removed deliveryZones
 >;
 
 // --- Seeding Mutation --- 
@@ -179,46 +208,3 @@ export const getBranchSalesAnalytics = query({
     return branchSales;
   },
 });
-
-// Internal mutation to seed initial data (if needed)
-export const seedInitialData = internalMutation(
-    async (ctx: MutationCtx) => {
-        // Check if data already exists to prevent re-seeding
-        const existingBranches = await ctx.db.query("branches").collect();
-        if (existingBranches.length > 0) {
-            console.log("Branch data already seeded.");
-            return;
-        }
-
-        console.log("Seeding initial branch data...");
-        const initialBranches: Omit<Doc<"branches">, "_id" | "_creationTime">[] = [
-            {
-                name: "Hogis Main",
-                address: "123 Hogis Way, Calabar",
-                contactNumber: "+2348000000001",
-                operatingHours: "9:00 AM - 10:00 PM Daily",
-                supportedOrderTypes: ["Delivery", "Dine-In", "Take-out"],
-                isActive: true,
-                minimumOrderAmount: 150000,
-                deliveryFee: 50000,
-                deliveryZone: {},
-            },
-            {
-                name: "Hogis Express",
-                address: "456 Express Ln, Calabar",
-                contactNumber: "+2348000000002",
-                operatingHours: "10:00 AM - 8:00 PM Mon-Sat",
-                supportedOrderTypes: ["Take-out"],
-                isActive: true,
-                minimumOrderAmount: 100000,
-                deliveryFee: undefined,
-                deliveryZone: undefined,
-            },
-        ];
-
-        for (const branchData of initialBranches) {
-            await ctx.db.insert("branches", branchData);
-        }
-        console.log(`Seeded ${initialBranches.length} branches.`);
-    }
-);
