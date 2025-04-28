@@ -38,7 +38,8 @@ export default function AdminInsights() {
       console.log("Seeding result:", result);
       toast({ 
         title: "Seeding Successful", 
-        description: `Successfully seeded ${result?.seededCount ?? 0} delivery zones.`,
+        // Use zonesAdded as indicated by the type error
+        description: `Successfully seeded ${result?.zonesAdded ?? 0} delivery zones.`,
         variant: "default",
       });
     } catch (error) {
@@ -117,7 +118,7 @@ export default function AdminInsights() {
               {isSeeding ? 'Seeding...' : 'Seed Delivery Zones'}
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground mt-2">Note: This will add predefined delivery zones if they don't already exist. Running it multiple times is usually safe.</p>
+          <p className="text-sm text-muted-foreground mt-2">Note: This will add predefined delivery zones if they don&apos;t already exist. Running it multiple times is usually safe.</p>
         </CardContent>
       </Card>
     </div>

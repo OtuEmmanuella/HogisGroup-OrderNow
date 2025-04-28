@@ -8,7 +8,7 @@
  * @module
  */
 
-import type * as actions from "../actions.js";
+import type * as actions_sendOrderEmails from "../actions/sendOrderEmails.js";
 import type * as branches from "../branches.js";
 import type * as clerk from "../clerk.js";
 import type * as constants from "../constants.js";
@@ -17,12 +17,15 @@ import type * as deliveryZones from "../deliveryZones.js";
 import type * as email from "../email.js";
 import type * as feedback from "../feedback.js";
 import type * as files from "../files.js";
+import type * as http from "../http.js";
 import type * as lib_auth from "../lib/auth.js";
 import type * as lib_getUserFromAuth from "../lib/getUserFromAuth.js";
 import type * as lib_sendEmail from "../lib/sendEmail.js";
 import type * as menu from "../menu.js";
+import type * as miscMutations from "../miscMutations.js";
 import type * as orders from "../orders.js";
 import type * as promotions from "../promotions.js";
+import type * as sendOrderEmails from "../sendOrderEmails.js";
 import type * as sharedCarts from "../sharedCarts.js";
 import type * as users from "../users.js";
 import type * as webhook_actions from "../webhook_actions.js";
@@ -42,7 +45,7 @@ import type {
  * ```
  */
 declare const fullApi: ApiFromModules<{
-  actions: typeof actions;
+  "actions/sendOrderEmails": typeof actions_sendOrderEmails;
   branches: typeof branches;
   clerk: typeof clerk;
   constants: typeof constants;
@@ -51,12 +54,15 @@ declare const fullApi: ApiFromModules<{
   email: typeof email;
   feedback: typeof feedback;
   files: typeof files;
+  http: typeof http;
   "lib/auth": typeof lib_auth;
   "lib/getUserFromAuth": typeof lib_getUserFromAuth;
   "lib/sendEmail": typeof lib_sendEmail;
   menu: typeof menu;
+  miscMutations: typeof miscMutations;
   orders: typeof orders;
   promotions: typeof promotions;
+  sendOrderEmails: typeof sendOrderEmails;
   sharedCarts: typeof sharedCarts;
   users: typeof users;
   webhook_actions: typeof webhook_actions;

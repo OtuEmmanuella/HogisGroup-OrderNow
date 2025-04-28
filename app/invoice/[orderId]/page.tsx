@@ -15,6 +15,37 @@ import logo from '@/images/logo.webp';
 import Link from 'next/link';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 
+// Define type for Invoice Data based on useQuery result
+interface InvoiceItem {
+  _id: Id<'menuItems'>; // Assuming items have an _id
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+}
+
+interface InvoiceData {
+  _id: Id<'orders'>;
+  _creationTime: number;
+  orderType: string;
+  totalAmount: number;
+  discountAmount: number;
+  subTotal: number;
+  items: InvoiceItem[];
+  branch?: { name: string; address?: string; contactNumber?: string };
+  user?: { 
+    name?: string | null;
+    email?: string | null;
+  };
+  deliveryAddress?: { 
+    street: string; 
+    customerPhone: string;
+    recipientName?: string;
+    recipientPhone?: string;
+  };
+  notes?: string;
+}
+
 const VAT_RATE = 0.075; // 7.5% VAT for Nigeria
 
 // PDF styles
@@ -35,7 +66,7 @@ const styles = StyleSheet.create({
 });
 
 // PDF Document Component
-const InvoicePDF = ({ data }: { data: any }) => (
+const InvoicePDF = ({ data }: { data: InvoiceData }) => (
   <Document>
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>
@@ -60,7 +91,7 @@ const InvoicePDF = ({ data }: { data: any }) => (
           <Text style={styles.col3}>Unit Price</Text>
           <Text style={styles.col4}>Total</Text>
         </View>
-        {data.items.map((item: any) => (
+        {data.items.map((item) => (
           <View key={item._id} style={styles.tableRow}>
             <Text style={styles.col1}>{item.name}</Text>
             <Text style={styles.col2}>{item.quantity}</Text>
@@ -106,7 +137,7 @@ export default function InvoicePage() {
     const router = useRouter();
     const orderId = params.orderId as Id<"orders">;
 
-    const invoiceData = useQuery(api.orders.getInvoiceData, orderId ? { orderId } : 'skip');
+    const invoiceData = useQuery(api.orders.getInvoiceData, orderId ? { orderId } : 'skip') as InvoiceData | null | undefined;
 
     const handlePrint = () => {
         window.print();
@@ -200,8 +231,8 @@ export default function InvoicePage() {
                     <h3 className="text-base font-semibold mb-2">Bill To:</h3>
                     <p>{user?.name ?? 'Customer'}</p>
                     <p>{user?.email ?? 'Email not available'}</p>
-                    <p className="text-sm text-muted-foreground">{user?.address?.street ?? 'Street Address Not Set'}</p>
-                    <p className="text-sm text-muted-foreground">{user?.address?.customerPhone ?? 'Phone Not Set'}</p>
+                    <p className="text-sm text-muted-foreground">Street Address Not Set</p>
+                    <p className="text-sm text-muted-foreground">Phone Not Set</p>
                 </div>
                 {orderType === 'Delivery' && deliveryAddress && (
                     <div>

@@ -153,8 +153,7 @@ export async function POST(req: Request) {
           reference: verifiedData.reference,
           status: verifiedData.status,
           amount: verifiedData.amount,
-          metadata: metadataForConvex, // Use the correctly typed metadata
-          customer: payload.data.customer
+          metadata: metadataForConvex
         }
       });
 

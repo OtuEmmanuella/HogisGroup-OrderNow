@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo } from 'react'; // Removed useRef, useEffect
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Doc, Id } from '@/convex/_generated/dataModel';
@@ -15,7 +15,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useVirtualizer } from '@tanstack/react-virtual';
+// Removed unused useVirtualizer import
 import { PromoBanner } from "./PromoBanner";
 
 const MOBILE_PREVIEW_COUNT = 8;
@@ -108,7 +108,7 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart, isAddingTo
   const items = useQuery(api.menu.getMenuItems, { categoryId, includeUnavailable: false });
   const [isExpanded, setIsExpanded] = useState(false);
   const isMobile = useMediaQuery('(max-width: 767px)');
-  const [isInView, setIsInView] = useState(false);
+  // Removed unused isInView state
 
   // Different preview counts for mobile and desktop
   const DESKTOP_PREVIEW_COUNT = 10;

@@ -1,7 +1,9 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 import { ensureAdmin } from "./lib/auth"; // Assuming admin rights needed for seeding
+import { getUserFromAuth } from "./lib/getUserFromAuth"; // Corrected path
+import { api } from "./_generated/api";
 
 // Define the structure for a delivery zone document
 export const deliveryZoneSchema = {
@@ -33,6 +35,39 @@ export const getById = query({
     },
 });
 
+/**
+ * Fetches all active delivery zones.
+ * Assumes zones are active if isActive is true or undefined/null.
+ */
+export const getActiveDeliveryZones = query({
+  args: {},
+  handler: async (ctx) => {
+    const zones = await ctx.db
+      .query("deliveryZones")
+      // Filter for zones explicitly marked as active OR where isActive is not set to false
+      // This handles cases where isActive might be undefined/null initially
+      .filter((q) => q.neq(q.field("isActive"), false))
+      .collect();
+    return zones;
+  },
+});
+
+/**
+ * Gets a specific delivery zone by its ID.
+ * Useful for displaying the name after selection.
+ */
+export const getDeliveryZoneById = query({
+    args: { zoneId: v.id("deliveryZones") },
+    handler: async (ctx, args) => {
+        try {
+            const zone = await ctx.db.get(args.zoneId);
+            return zone;
+        } catch (error) {
+            console.error(`Failed to get delivery zone ${args.zoneId}:`, error);
+            return null; // Return null if not found or error occurs
+        }
+    },
+});
 
 // --- Seeding Mutation --- 
 // Combine all unique zones from the previous branch structure
@@ -134,6 +169,67 @@ export const seedInitialDeliveryZones = mutation({
     console.log(`Seeding complete. Added ${zonesAdded} new delivery zones.`);
     return { zonesAdded };
   },
+});
+
+/**
+ * Seeds the database with initial delivery zones if none exist.
+ * Requires admin privileges.
+ */
+export const seedDeliveryZones = mutation({
+    args: {},
+    handler: async (ctx) => {
+        // Authorization: Ensure the user is an admin
+        await ensureAdmin(ctx);
+
+        // const user = await getUserFromAuth(ctx); // No longer needed directly here if ensureAdmin handles it
+
+        // Check if zones already exist to prevent duplicates
+        const existingZones = await ctx.db.query("deliveryZones").take(1);
+        if (existingZones.length > 0) {
+            console.log("Delivery zones already exist, skipping seeding.");
+            return { success: true, message: "Zones already seeded." };
+        }
+
+        // Define sample zones (adjust names, descriptions, and fees as needed)
+        const sampleZones = [
+            {
+                name: "Zone A (Local)",
+                description: "Nearby areas, standard delivery.",
+                baseFee: 50000, // 500 NGN in kobo
+                peakFee: 75000, // 750 NGN in kobo
+                isActive: true,
+            },
+            {
+                name: "Zone B (Mid-Range)",
+                description: "Slightly further areas.",
+                baseFee: 80000, // 800 NGN in kobo
+                peakFee: 110000, // 1100 NGN in kobo
+                isActive: true,
+            },
+            {
+                name: "Zone C (Extended)",
+                description: "Outer delivery areas.",
+                baseFee: 120000, // 1200 NGN in kobo
+                peakFee: 150000, // 1500 NGN in kobo
+                isActive: true,
+            },
+            {
+                name: "Inactive Zone",
+                description: "Currently not served.",
+                baseFee: 999999, // High fee
+                peakFee: 999999,
+                isActive: false,
+            },
+        ];
+
+        // Insert the sample zones
+        for (const zone of sampleZones) {
+            await ctx.db.insert("deliveryZones", zone);
+        }
+
+        console.log(`Seeded ${sampleZones.length} delivery zones.`);
+        return { success: true, message: `Seeded ${sampleZones.length} delivery zones.` };
+    },
 });
 // --- End Seeding ---
 

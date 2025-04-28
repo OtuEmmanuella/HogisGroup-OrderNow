@@ -63,18 +63,21 @@ export const handleUserCreated = action({
 export const processVerifiedPaystackWebhook = action({
   args: {
     event: v.string(),
-    verifiedData: v.object({
-      reference: v.string(),
+    verifiedData: v.object({ // Define a specific schema for Paystack data
       status: v.string(),
-      amount: v.number(),
-      metadata: v.optional(v.object({
-        orderId: v.optional(v.id("orders")),
-        cartId: v.optional(v.id("sharedCarts")),
-        userId: v.optional(v.string()),
+      reference: v.string(),
+      amount: v.number(), // Paystack amount is usually in kobo/cents (integer)
+      metadata: v.optional(v.object({ // Metadata might be optional or structured differently
+        orderId: v.optional(v.id("orders")), // Use v.id if it's a Convex Id
+        cartId: v.optional(v.id("sharedCarts")), // Use v.id if it's a Convex Id
+        userId: v.optional(v.string()), // Assuming userId in metadata is a string (Clerk ID?)
+        // Explicitly add fields observed in the payload
         cancel_action: v.optional(v.string()),
+        referrer: v.optional(v.string()),
+        // v.object allows other fields implicitly
       })),
-      customer: v.any(),
-    }),
+      // Add other expected top-level fields from Paystack if needed
+    }), // Convex v.object allows extra fields by default
   },
   handler: async (ctx, args) => {
     console.log(`[CONVEX Action(webhook_actions:processVerifiedPaystackWebhook)] Received webhook args:`, args);

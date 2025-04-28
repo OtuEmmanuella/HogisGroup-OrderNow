@@ -110,8 +110,8 @@ export default function OrderDetailsPage() {
         <Card>
           <CardContent className="py-8">
             <div className="text-center space-y-4">
-              <p className="text-lg text-red-600">Order not found or you don't have permission to view it.</p>
-              <Button variant="outline" onClick={() => router.push('/profile')}>
+            <p className="text-lg text-red-600">Order not found or you don&apos;t have permission to view it.</p>
+            <Button variant="outline" onClick={() => router.push('/profile')}>
                 Go to Profile
               </Button>
             </div>
@@ -142,7 +142,7 @@ export default function OrderDetailsPage() {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-xl">Order #{order._id.slice(-6)}</CardTitle>
+              <CardTitle className="text-xl">Order &#35;{order._id.slice(-6)}</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 Placed on {format(new Date(order.createdAt), 'PPP')}
               </p>

@@ -1,10 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, Dispatch, SetStateAction } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useOrderContext } from '@/context/OrderContext';
 import { useQuery, useMutation } from 'convex/react';
-// Remove useAction import if no longer needed, or keep if used elsewhere
-// import { useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useRouter } from 'next/navigation';
-import { Loader2, Tag, X, Slash } from 'lucide-react';
+import { Loader2, Tag, X } from 'lucide-react';
 import AddressForm, { type AddressFormData } from '@/components/AddressForm';
 import { useToast } from '@/hooks/use-toast';
 import { useUser } from '@clerk/nextjs';
@@ -43,17 +41,7 @@ import { type Id, type Doc } from '@/convex/_generated/dataModel';
 // Import the server action directly
 import { initializePaystackTransaction } from '@/app/actions/initializePaystackTransaction';
 import DeliveryZoneSelector from '@/components/DeliveryZoneSelector';
-// Removed problematic DeliveryZoneType import
 import { ValidatedPromo } from '@/convex/promotions';
-
-// Define proper interfaces to avoid using 'any'
-interface DeliveryAddress {
-  street: string;
-  customerPhone: string;
-  recipientName?: string;
-  recipientPhone?: string;
-  // zoneName and deliveryFee removed as they are handled via deliveryZoneId
-}
 
 interface CartItem {
   _id: Id<"menuItems">;
@@ -64,33 +52,32 @@ interface CartItem {
   // Add other fields as needed
 }
 
-interface OrderItemForPayload {
-  menuItemId: Id<'menuItems'>;
-  quantity: number;
-  // Add other fields like price or options if needed by backend
-}
-
-// Interface for the data passed to createOrder mutation
-interface CreateOrderPayload {
-  branchId: Id<'branches'>;
-  userId: Id<'users'>; // Assuming Clerk user ID is used directly or mapped
-  customerName: string;
-  items: OrderItemForPayload[];
+// Define the argument type for the createOrder mutation based on convex/orders.ts
+type CreateOrderArgs = {
+  branchId: Id<"branches">;
+  userId: string;
+  customerName?: string;
+  items: Array<{
+    menuItemId: Id<"menuItems">;
+    quantity: number;
+  }>;
   orderType: "Delivery" | "Dine-In" | "Take-out";
-  appliedPromoId?: Id<'promotions'>;
-  deliveryAddress?: DeliveryAddress; // Only for Delivery
-  deliveryZoneId?: Id<'deliveryZones'>; // Only for Delivery
-  pickupTime?: number; // Timestamp, Only for Take-out
-  dineInDateTime?: number; // Timestamp, Only for Dine-In
-  dineInGuests?: number; // Only for Dine-In
-  dineInReservationType?: string; // Only for Dine-In
-}
+  deliveryAddress?: {
+    street: string;
+    customerPhone: string;
+    recipientPhone?: string;
+    recipientName?: string;
+  };
+  dineInReservationType?: string;
+  appliedPromoId?: Id<"promotions">;
+};
 
-// Type for Paystack Action Result (adjust based on actual return type)
-// Assuming it might return error OR data based on linter feedback
-type PaystackResult = 
-  | { error: string; data?: never; authorizationUrl?: never }
-  | { error?: never; data?: { authorization_url: string; [key: string]: any }; authorizationUrl?: string; [key: string]: any };
+// Define the return type for the initializePaystackTransaction action
+// type PaystackResult = {
+//   authorizationUrl: string;
+//   accessCode: string;
+//   reference: string;
+// };
 
 export default function CheckoutPage() {
   const router = useRouter();
@@ -101,10 +88,6 @@ export default function CheckoutPage() {
     selectedOrderType,
     cartItems,
     cartTotal,
-    // resetOrderFlow, // Removed as unused - keep if needed elsewhere
-    // activeSharedCartId // Removed as unused - keep if needed elsewhere
-    clearCart, // Assuming clearCart exists in context
-    // Removed setOrderDetails as it's not in context type
   } = useOrderContext();
 
   const [deliveryAddress, setDeliveryAddress] = useState<AddressFormData | null>(null);
@@ -134,7 +117,7 @@ export default function CheckoutPage() {
   );
 
   const createOrder = useMutation(api.orders.createOrder);
-  const updateOrderStatus = useMutation(api.orders.updateOrderStatus);
+  // const updateOrderStatus = useMutation(api.orders.updateOrderStatus); // Removed unused updateOrderStatus
   // Remove useAction hooks for Paystack
   // const initializePaystack = useAction(api.paystack.initializeTransaction);
   // const initializeSharedCartPayment = useAction(api.paystack.initializeSharedCartTransaction);
@@ -246,7 +229,7 @@ export default function CheckoutPage() {
       toast({ title: 'Cannot Proceed', description, variant: 'destructive' });
       return;
     }
-    // ... rest of the initial checks (user email) ...
+
     if (!user?.primaryEmailAddress?.emailAddress) {
       toast({
         title: 'User Error',
@@ -257,139 +240,74 @@ export default function CheckoutPage() {
     }
 
     setIsSubmitting(true);
-    let orderId: Id<"orders"> | null = null; // Keep track of created order ID
+    let orderId: Id<"orders"> | null = null;
 
     try {
-      // Construct delivery address (only if needed)
+      // Construct delivery address
       const completeDeliveryAddress = requiresAddress && deliveryAddress
         ? {
-          street: deliveryAddress.street ?? '',
-          customerPhone: deliveryAddress.customerPhone ?? '',
-          recipientName: deliveryAddress.isOrderingForSomeoneElse ? deliveryAddress.recipientName : undefined,
-          recipientPhone: deliveryAddress.isOrderingForSomeoneElse ? deliveryAddress.recipientPhone : undefined,
-          // zoneName is no longer needed here, derived from deliveryZoneId in backend
-          // deliveryFee is also handled in backend based on zoneId
-        }
+            street: deliveryAddress.street ?? '',
+            customerPhone: deliveryAddress.customerPhone ?? '',
+            recipientName: deliveryAddress.isOrderingForSomeoneElse ? deliveryAddress.recipientName : undefined,
+            recipientPhone: deliveryAddress.isOrderingForSomeoneElse ? deliveryAddress.recipientPhone : undefined,
+          }
         : undefined;
 
-      // ... construct dineInDetails ...
+      // Construct dine-in details
       const dineInDetails = requiresDineInDetails && dineInDateTime
         ? {
-          dineInDateTime: combineDateAndTime(
-            dineInDateTime,
-            dineInTime
-          ).getTime(),
-          dineInGuests: parseInt(dineInGuests, 10),
-          dineInReservationType,
-        }
-        : {};
+            dineInDateTime: combineDateAndTime(dineInDateTime, dineInTime).getTime(),
+            dineInGuests: parseInt(dineInGuests, 10),
+            dineInReservationType,
+          }
+        : undefined;
 
-
-      const validatedOrderType = selectedOrderType as "Delivery" | "Dine-In" | "Take-out";
-
-      // Construct the core order data for the mutation
       const orderDataForMutation = {
         branchId: selectedBranchId!,
-        userId: user.id as Id<'users'>, // Use Clerk user ID directly if your backend expects it
+        userId: user.id,
         customerName,
         items: cartItems.map((item: CartItem) => ({
-          menuItemId: item._id as Id<'menuItems'>, // Use item._id for menuItemId
+          menuItemId: item._id,
           quantity: item.quantity,
-          // Include price details if needed by backend, otherwise calculated there
         })),
-        orderType: validatedOrderType,
+        orderType: selectedOrderType as "Delivery" | "Dine-In" | "Take-out",
         appliedPromoId: (validationResult && 'promoId' in validationResult) ? validationResult.promoId : undefined,
-        // Add delivery/pickup/dine-in specifics
-        ...(validatedOrderType === 'Delivery' && {
-           deliveryAddress: completeDeliveryAddress,
-           deliveryZoneId: selectedZoneId // Pass the selected zone ID
+        ...(selectedOrderType === 'Delivery' && {
+          deliveryAddress: completeDeliveryAddress,
+          deliveryZoneId: selectedZoneId
         }),
-        ...(validatedOrderType === 'Take-out' && {
-           pickupTime: parsePickupTime(pickupTime)
+        ...(selectedOrderType === 'Take-out' && {
+          pickupTime: parsePickupTime(pickupTime)
         }),
-        ...(validatedOrderType === 'Dine-In' && dineInDetails),
-        // Note: totalAmount will be calculated securely in the backend mutation
+        ...(selectedOrderType === 'Dine-In' && dineInDetails),
       };
 
-      // 1. Create the Order in Convex (status 'Pending Payment')
-      orderId = await createOrder(orderDataForMutation as any); // Use 'as any' carefully or refine type
+      // Create the order
+      orderId = await createOrder(orderDataForMutation as CreateOrderArgs);
 
       if (!orderId) {
         throw new Error("Failed to create order ID.");
       }
 
-      console.log('Order created with ID:', orderId);
-      console.log('Final total including delivery (kobo):', finalTotalWithDeliveryKobo);
+      // Initialize Paystack payment with proper type handling
+      const paymentResult = await initializePaystackTransaction({ orderId });
 
-      // 2. Initialize Paystack Transaction
-      const amountToPayKobo = finalTotalWithDeliveryKobo;
-      console.log('Initializing Paystack payment for', amountToPayKobo, 'Kobo');
-
-      // *** IMPORTANT: Verify the exact arguments required by your server action ***
-      // The linter suggests it only expects { orderId }, which seems incorrect.
-      // Keeping the full args commented out for reference.
-      /*
-      const paymentInputArgs = {
-        email: user.primaryEmailAddress.emailAddress,
-        amount: amountToPayKobo,
-        metadata: {
-          orderId: orderId.toString(),
-          userId: user.id,
-          customerName: customerName,
-          orderType: validatedOrderType,
-          cancel_action: `${window.location.origin}/checkout`
-        },
-        callback_url: `${window.location.origin}/order-confirmation?orderId=${orderId.toString()}`
-      };
-      console.log("Paystack input:", paymentInputArgs);
-      */
-
-      // FIXED: Passing only orderId based on linter error - VERIFY THIS!
-      const paymentInput = { orderId: orderId };
-      console.log("Paystack input (based on linter):", paymentInput);
-
-      // *** IMPORTANT: Verify the actual return type of your server action ***
-      // Casting to PaystackResult type based on combined linter feedback/assumptions
-      const paymentResult = await initializePaystackTransaction(paymentInput) as PaystackResult;
-      console.log("Paystack result:", paymentResult);
-
-      // Check for error first
-      if (paymentResult?.error) {
-          throw new Error(paymentResult.error);
+      if (!paymentResult || !paymentResult.authorizationUrl) {
+        throw new Error('Failed to initialize payment');
       }
-      // FIXED: Check authorizationUrl directly on the result object (camelCase)
-      const authorizationUrl = paymentResult?.authorizationUrl; 
-      if (!authorizationUrl) {
-          throw new Error('Paystack authorization URL not found in the server action result. Verify action return type.');
-      }
-      
-      console.log('Redirecting to Paystack:', authorizationUrl);
-      router.push(authorizationUrl);
 
-      // Clear cart *after* successfully redirecting to Paystack
-      // clearCart(); // Consider clearing cart on successful payment confirmation instead
+      router.push(paymentResult.authorizationUrl);
 
-    } catch (error: any) {
+    } catch (error: unknown) { // Replace any with unknown
       console.error("Checkout process failed:", error);
       toast({
         title: 'Checkout Error',
-        description: error.message || 'An unexpected error occurred. Please try again.',
+        description: (error instanceof Error ? error.message : String(error)) || 'An unexpected error occurred.',
         variant: 'destructive',
       });
 
-      // Optional: If order was created but payment init failed, update status?
-      if (orderId) {
-        try {
-            // await updateOrderStatus({ orderId, status: 'Payment Failed' }); // Or a different status
-             console.warn(`Order ${orderId} created but payment initialization failed. Consider manual review or status update.`);
-        } catch (statusError) {
-             console.error("Failed to update order status after payment init failure:", statusError);
-        }
-      }
-
-      setIsSubmitting(false); // Re-enable button on failure
+      setIsSubmitting(false);
     }
-    // No need to set submitting false here if redirecting
   };
 
   // Helper function to format currency
@@ -418,19 +336,18 @@ export default function CheckoutPage() {
 
   if (isLoadingPage) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+      <div className="flex justify-center items-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   if (isOrderContextMissing) {
-     // This case should ideally be handled by the useEffect redirect,
-     // but keep a fallback UI just in case.
+    // Handled by useEffect redirect, show minimal loading or null
     return (
-        <div className="container mx-auto px-4 py-8 text-center">
-            <p>Loading order details or redirecting...</p>
-        </div>
+      <div className="flex justify-center items-center min-h-screen">
+        <p>Redirecting...</p>
+      </div>
     );
   }
 
@@ -440,13 +357,9 @@ export default function CheckoutPage() {
       <Breadcrumb className="mb-6">
         <BreadcrumbList>
           <BreadcrumbItem>
-            <BreadcrumbLink href="/home">Home</BreadcrumbLink>
+            <BreadcrumbLink href="/home">Menu</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/cart">Cart</BreadcrumbLink> {/* Assuming /cart exists */}
-          </BreadcrumbItem>
-           <BreadcrumbSeparator />
           <BreadcrumbItem>
             <BreadcrumbPage>Checkout</BreadcrumbPage>
           </BreadcrumbItem>
@@ -455,71 +368,77 @@ export default function CheckoutPage() {
 
       <h1 className="text-3xl font-bold mb-6">Checkout</h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Left Column: Order Details & Forms */}
+      <div className="grid md:grid-cols-3 gap-6">
+        {/* Left Column: Order Details & Inputs */}
         <div className="md:col-span-2 space-y-6">
-
+        
           {/* Customer Name */}
           <Card>
-             <CardHeader>
-                 <CardTitle>Your Information</CardTitle>
-             </CardHeader>
-             <CardContent>
-                <Label htmlFor="customerName">Full Name</Label>
-                <Input
-                  id="customerName"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="Enter your full name"
-                  required
-                />
-             </CardContent>
+            <CardHeader>
+              <CardTitle>Your Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Label htmlFor="customerName">Full Name</Label>
+              <Input 
+                id="customerName"
+                placeholder="Enter your full name"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                disabled={isSubmitting}
+              />
+              {/* Add email display? User is already logged in */} 
+            </CardContent>
           </Card>
-
+          
           {/* Order Type Specific Inputs */}
           {selectedOrderType === 'Delivery' && (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle>Delivery Address</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <AddressForm
-                    onSubmit={setDeliveryAddress}
-                  />
-                </CardContent>
-              </Card>
-              {/* Delivery Zone Selector should show as soon as order type is Delivery */}
-              <Card>
-                 <CardHeader>
-                    <CardTitle>Delivery Zone</CardTitle>
-                    <CardDescription>Select the zone for your delivery address.</CardDescription>
-                 </CardHeader>
-                 <CardContent>
-                    <DeliveryZoneSelector
-                      selectedZoneId={selectedZoneId} // Pass selected ID
-                      isPeakHour={isPeakHour}        // Pass peak hour status
-                      onZoneSelect={handleZoneSelect} // Handle selection update
+            <Card>
+              <CardHeader>
+                <CardTitle>Delivery Details</CardTitle>
+                <CardDescription>Select your zone and enter your address.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Delivery Zone Selection - Wrap in scrollable div */}
+                <div>
+                    <Label>Delivery Zone</Label>
+                    <div className="mt-1 max-h-72 overflow-y-auto border rounded-md p-1"> {/* Scroll wrapper */}
+                       <DeliveryZoneSelector 
+                           selectedZoneId={selectedZoneId} 
+                           onZoneSelect={handleZoneSelect}
+                       />
+                    </div>
+                    {selectedZoneId && deliveryFee > 0 && (
+                        <p className="text-sm text-muted-foreground mt-1">Delivery Fee: {formatCurrency(deliveryFee)}</p>
+                    )}
+                </div>
+                
+                {/* Address Form */}
+                <div>
+                    <Label>Address & Phone</Label>
+                    <AddressForm 
+                        onSubmit={setDeliveryAddress} 
                     />
-                 </CardContent>
-              </Card>
-            </>
+                </div>
+              </CardContent>
+            </Card>
           )}
 
           {selectedOrderType === 'Take-out' && (
             <Card>
               <CardHeader>
-                <CardTitle>Pickup Time</CardTitle>
+                 <CardTitle>Pickup Details</CardTitle>
+                 <CardDescription>When would you like to pick up your order?</CardDescription>
               </CardHeader>
               <CardContent>
-                <Label htmlFor="pickupTime">Select Time</Label>
-                <Input
-                  id="pickupTime"
-                  type="time"
-                  value={pickupTime}
-                  onChange={(e) => setPickupTime(e.target.value)}
-                  required
-                />
+                 <Label htmlFor="pickupTime">Pickup Time</Label>
+                 <Input 
+                   id="pickupTime"
+                   type="time" 
+                   value={pickupTime} 
+                   onChange={(e) => setPickupTime(e.target.value)} 
+                   disabled={isSubmitting}
+                 />
+                 {/* Add note about branch hours? */} 
               </CardContent>
             </Card>
           )}
@@ -527,156 +446,154 @@ export default function CheckoutPage() {
           {selectedOrderType === 'Dine-In' && (
             <Card>
               <CardHeader>
-                <CardTitle>Dine-In Reservation</CardTitle>
+                 <CardTitle>Dine-In Reservation</CardTitle>
+                 <CardDescription>Provide details for your dine-in experience.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
+                 <div>
                    <Label htmlFor="dineInDate">Date</Label>
-                   <DatePicker onChange={(date) => setDineInDateTime(date)} />
-                </div>
+                   <DatePicker 
+                     selected={dineInDateTime} 
+                     onChange={setDineInDateTime} 
+                     // disabled prop removed as it's not supported by the component
+                   />
+                 </div>
                  <div>
                    <Label htmlFor="dineInTime">Time</Label>
-                   <Input
-                     id="dineInTime"
-                     type="time"
-                     value={dineInTime}
-                     onChange={(e) => setDineInTime(e.target.value)}
-                     required
+                   <Input 
+                     id="dineInTime" 
+                     type="time" 
+                     value={dineInTime} 
+                     onChange={(e) => setDineInTime(e.target.value)} 
+                     disabled={isSubmitting}
                    />
                  </div>
                  <div>
                    <Label htmlFor="dineInGuests">Number of Guests</Label>
-                   <Input
-                     id="dineInGuests"
-                     type="number"
-                     min="1"
-                     value={dineInGuests}
-                     onChange={(e) => setDineInGuests(e.target.value)}
-                     placeholder="e.g., 4"
-                     required
+                   <Input 
+                     id="dineInGuests" 
+                     type="number" 
+                     min="1" 
+                     value={dineInGuests} 
+                     onChange={(e) => setDineInGuests(e.target.value)} 
+                     placeholder="e.g., 2"
+                     disabled={isSubmitting}
                    />
                  </div>
                  <div>
-                    <Label htmlFor="dineInReservationType">Reservation Type</Label>
-                     <Select value={dineInReservationType} onValueChange={setDineInReservationType} required>
+                   <Label htmlFor="dineInReservationType">Occasion (Optional)</Label>
+                    <Select 
+                        value={dineInReservationType} 
+                        onValueChange={setDineInReservationType}
+                        disabled={isSubmitting}
+                    > 
                        <SelectTrigger id="dineInReservationType">
-                         <SelectValue placeholder="Select type (e.g., Birthday, Standard)" />
+                           <SelectValue placeholder="Select occasion type" />
                        </SelectTrigger>
                        <SelectContent>
-                         <SelectItem value="Standard">Standard</SelectItem>
-                         <SelectItem value="Birthday">Birthday</SelectItem>
-                         <SelectItem value="Anniversary">Anniversary</SelectItem>
-                         <SelectItem value="Business">Business Meeting</SelectItem>
-                         <SelectItem value="Other">Other</SelectItem>
+                           <SelectItem value="casual">Casual Dining</SelectItem>
+                           <SelectItem value="birthday">Birthday</SelectItem>
+                           <SelectItem value="anniversary">Anniversary</SelectItem>
+                           <SelectItem value="business">Business Meeting</SelectItem>
+                           <SelectItem value="other">Other</SelectItem>
                        </SelectContent>
-                     </Select>
+                   </Select>
                  </div>
               </CardContent>
             </Card>
           )}
-
         </div>
 
-        {/* Right Column: Order Summary */}
+        {/* Right Column: Order Summary & Payment */}
         <div className="md:col-span-1 space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Order Summary</CardTitle>
-              {branch && <CardDescription>Branch: {branch.name}</CardDescription>}
-              <CardDescription>Order Type: {selectedOrderType}</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {cartItems.map((item: CartItem) => (
-                <div key={item._id?.toString()} className="flex justify-between items-center">
-                  <span>{item.name || 'Item'} x {item.quantity || 1}</span>
-                  <span>{formatCurrency((item.price || 0) * (item.quantity || 1) * 100)}</span>
-                </div>
-              ))}
-              <Separator />
-              <div className="flex justify-between font-medium">
-                <span>Subtotal</span>
-                <span>{formatCurrency(Math.round(cartTotal * 100))}</span>
-              </div>
-
-              {/* Promo Code Section */}
-               <div className="space-y-2 pt-2">
-                 <Label htmlFor="promoCode">Promo Code</Label>
-                 <div className="flex space-x-2">
-                    <Input
-                       id="promoCode"
-                       placeholder="Enter code"
-                       value={promoCodeInput}
-                       onChange={(e) => setPromoCodeInput(e.target.value)}
-                       disabled={Boolean(!!codeToValidate && validationResult && 'promoId' in validationResult)}
-                    />
-                    {(!codeToValidate || (validationResult && 'error' in validationResult)) && (
-                       <Button onClick={handleApplyPromoCode} disabled={!promoCodeInput || isPromoLoading}>
-                          {isPromoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Apply'}
-                       </Button>
-                    )}
-                    {(codeToValidate || (validationResult && 'promoId' in validationResult)) && (
-                       <Button variant="ghost" size="icon" onClick={handleRemovePromoCode} disabled={isPromoLoading}>
-                          <X className="h-4 w-4" />
-                       </Button>
-                    )}
+            <CardContent className="space-y-3">
+               {cartItems?.map((item: CartItem) => (
+                 <div key={item.cartItemId || item._id} className="flex justify-between text-sm">
+                   <span>{item.quantity}x {item.name}</span>
+                   <span>{formatCurrency(item.price * item.quantity)}</span>
                  </div>
-                 {isPromoLoading && <p className="text-sm text-muted-foreground">Validating...</p>}
-                 {validationResult && 'error' in validationResult && (
-                   <p className="text-sm text-red-600">Error: {String(validationResult.error)}</p>
-                 )}
-                 {validationResult && 'promoId' in validationResult && (
-                   <div className="text-sm text-green-600 flex items-center">
-                      <Tag className="h-4 w-4 mr-1" />
-                      <span>Discount: -{formatCurrency(validationResult.calculatedDiscount)}</span>
-                   </div>
-                 )}
+               ))}
+               <Separator />
+               <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(Math.round(cartTotal * 100))}</span>
                </div>
-
-              {selectedOrderType === 'Delivery' && (
-                <div className="flex justify-between">
-                  <span>Delivery Fee</span>
-                  <span>{selectedZoneId ? formatCurrency(deliveryFee) : 'Select zone'}</span>
-                </div>
-              )}
-
-              <Separator />
-              <div className="flex justify-between font-bold text-lg">
-                <span>Total</span>
-                <span>
-                   {selectedOrderType === 'Delivery'
-                     ? formatCurrency(finalTotalWithDeliveryKobo)
-                     : formatCurrency(finalTotalKobo)
-                   }
-                </span>
-              </div>
+               {/* Promo Code Section */}
+               {/* ... promo code display/input ... */} 
+               {/* Delivery Fee */}
+               {selectedOrderType === 'Delivery' && deliveryFee > 0 && (
+                   <div className="flex justify-between text-sm text-muted-foreground">
+                       <span>Delivery Fee</span>
+                       <span>{formatCurrency(deliveryFee)}</span>
+                   </div>
+               )}
+               {/* Discount */}
+               {appliedDiscountKobo > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>Discount ({promoCodeInput || codeToValidate})</span>
+                    <span>-{formatCurrency(appliedDiscountKobo)}</span>
+                  </div>
+                )}
+               <Separator />
+               <div className="flex justify-between font-semibold text-lg">
+                 <span>Total</span>
+                 <span>{formatCurrency(finalTotalWithDeliveryKobo)}</span>
+               </div>
             </CardContent>
             <CardFooter>
-              <Button
-                className="w-full"
-                onClick={handlePayment}
-                disabled={!isReadyForPayment || isSubmitting || isLoadingPage}
+              <Button 
+                className="w-full" 
+                size="lg" 
+                onClick={handlePayment} 
+                disabled={!isReadyForPayment || isSubmitting}
               >
-                {isSubmitting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : null}
-                {isSubmitting ? 'Processing...' : 'Proceed to Payment'}
-              </Button>
+                 {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                 {isSubmitting ? 'Processing...' : 'Proceed to Payment'}
+               </Button>
             </CardFooter>
           </Card>
-           {/* Display Branch Info */}
-           {branch && (
-             <Card>
-               <CardHeader>
-                 <CardTitle>Branch Details</CardTitle>
-               </CardHeader>
-               <CardContent>
-                 <p><strong>{branch.name}</strong></p>
-                 <p>{branch.address}</p>
-                 <p>Phone: {branch.contactNumber}</p>
-                 {/* Add operating hours if needed */}
-               </CardContent>
-             </Card>
-           )}
+          
+          {/* Promo Code Input Card */}
+          <Card>
+              <CardHeader>
+                  <CardTitle>Promo Code</CardTitle>
+                  <CardDescription>Have a code? Enter it below.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                  {codeToValidate && validationResult && 'promoId' in validationResult ? (
+                      <div className="flex justify-between items-center p-2 bg-green-100 rounded-md">
+                          <span className="text-sm text-green-700 font-medium">Code applied: {codeToValidate}</span>
+                          <Button variant="ghost" size="icon" onClick={handleRemovePromoCode} className="h-6 w-6 text-green-700">
+                              <X className="h-4 w-4" />
+                          </Button>
+                      </div>
+                  ) : (
+                      <div className="flex gap-2">
+                          <Input 
+                              placeholder="Enter code" 
+                              value={promoCodeInput}
+                              onChange={(e) => setPromoCodeInput(e.target.value.toUpperCase())}
+                              disabled={isSubmitting || isPromoLoading}
+                          />
+                          <Button 
+                              onClick={handleApplyPromoCode}
+                              disabled={!promoCodeInput || isSubmitting || isPromoLoading}
+                              variant="secondary"
+                          >
+                              {isPromoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
+                          </Button>
+                      </div>
+                  )}
+                  {isPromoLoading && <p className="text-xs text-muted-foreground mt-1">Validating...</p>}
+                  {validationResult && 'error' in validationResult && (
+                      <p className="text-xs text-red-600 mt-1">Error: {String(validationResult.error)}</p>
+                  )}
+              </CardContent>
+          </Card>
         </div>
       </div>
     </div>

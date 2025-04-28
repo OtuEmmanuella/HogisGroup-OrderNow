@@ -53,10 +53,9 @@ export default function AdminBranchesPage() {
     setIsSubmitting(true);
     console.log("Creating branch:", data);
     try {
-        // Attempt to parse deliveryZone if provided
+        // Payload no longer includes deliveryZone as it's not in the form schema
         const payload = {
-            ...data,
-            deliveryZone: data.deliveryZone ? JSON.parse(data.deliveryZone) : undefined
+            ...data
         };
       await createBranch(payload);
       toast({ title: "Success", description: "Branch created successfully." });
@@ -74,10 +73,9 @@ export default function AdminBranchesPage() {
     setIsSubmitting(true);
     console.log("Updating branch:", currentBranch._id, data);
      try {
-        // Attempt to parse deliveryZone if provided
+        // Payload no longer includes deliveryZone as it's not in the form schema
         const payload = {
-            ...data,
-            deliveryZone: data.deliveryZone ? JSON.parse(data.deliveryZone) : undefined
+            ...data
         };
       await updateBranch({ branchId: currentBranch._id, ...payload });
       toast({ title: "Success", description: "Branch updated successfully." });
@@ -134,10 +132,9 @@ export default function AdminBranchesPage() {
               onSubmit={currentBranch ? handleUpdateSubmit : handleCreateSubmit}
               isLoading={isSubmitting}
               defaultValues={currentBranch ? { 
-                  ...currentBranch,
-                  // Stringify zone for form
-                  deliveryZone: currentBranch.deliveryZone ? JSON.stringify(currentBranch.deliveryZone, null, 2) : '' 
-                } : { supportedOrderTypes: [], deliveryZone: '' }} // Provide empty defaults for add
+                  ...currentBranch
+                  // deliveryZone removed as it's not part of BranchFormData
+                } : { supportedOrderTypes: [] }} // Provide empty defaults for add
               submitButtonText={currentBranch ? 'Update Branch' : 'Create Branch'}
             />
              {/* Footer might not be needed if BranchForm has its own button */}
