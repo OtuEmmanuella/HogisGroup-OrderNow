@@ -33,12 +33,14 @@ export interface MenuItemCardProps {
 const formatCurrency = (amountKobo: number) => {
   if (typeof amountKobo !== 'number' || isNaN(amountKobo)) {
       console.warn("Invalid amount passed to formatCurrency:", amountKobo);
-      return "N/A"; // Return a placeholder or throw an error
+      return "N/A";
   }
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: 'NGN',
-  }).format(amountKobo / 100); // Convert kobo to Naira
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(amountKobo / 100);
 };
 
 // Define the component function

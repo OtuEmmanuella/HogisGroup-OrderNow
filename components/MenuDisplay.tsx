@@ -34,9 +34,17 @@ interface MenuItemCardProps {
 }
 
 export function MenuItemCard({ item, onAddToCart, isAddingToCart }: MenuItemCardProps) {
-  const displayPrice = item.price ? (item.price / 100).toFixed(2) : 'N/A';
-  const imageUrl = item.imageUrl;
   const [imageLoading, setImageLoading] = useState(true);
+  const imageUrl = item.imageUrl;
+
+  const formatPrice = (amountKobo: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountKobo);
+  };
 
   return (
     <Card className={cn(
@@ -83,7 +91,7 @@ export function MenuItemCard({ item, onAddToCart, isAddingToCart }: MenuItemCard
           )}
         </CardContent>
         <CardFooter className="p-0 flex flex-col items-start mt-auto">
-          <p className="font-bold text-sm mb-2">₦{displayPrice}</p>
+          <p className="font-bold text-sm mb-2">{formatPrice(item.price)}</p>
           <Button
             size="sm"
             className="w-full text-xs"

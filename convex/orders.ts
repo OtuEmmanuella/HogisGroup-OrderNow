@@ -55,6 +55,62 @@ export const getOrderWithDetails = query({
 // Removed getValidTicketsForEvent
 
 // Internal mutation for webhook to update status without admin check
+// Internal query to fetch full order details for the PHP API payload
+export const internalGetOrderDetailsForApi = internalQuery({
+  args: { orderId: v.id("orders") },
+  handler: async (ctx, { orderId }) => {
+    const order = await ctx.db.get(orderId);
+    if (!order) return null;
+
+    const branch = await ctx.db.get(order.branchId);
+    const user = await ctx.db.query("users").withIndex("by_user_id", q => q.eq("userId", order.userId)).first();
+
+    const itemsWithDetails = await Promise.all(
+      order.items.map(async (item) => {
+        const menuItem = await ctx.db.get(item.menuItemId);
+        return {
+          itemId: item.menuItemId,
+          name: menuItem?.name ?? "Unknown Item",
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          totalPrice: item.quantity * item.unitPrice, // Calculate total price
+          // Removed notes: item.notes, as it doesn't exist on the item type
+        };
+      })
+    );
+
+    // Construct the payload structure similar to INTEGRATION_PHP_SYSTEM.md
+    return {
+      orderId: order._id,
+      orderReference: order._id.toString(), // Use order ID as reference
+      orderTimestamp: new Date(order._creationTime).toISOString(),
+      orderType: order.orderType,
+      customer: {
+        name: user?.name ?? "Unknown User",
+        phone: user?.address?.customerPhone ?? "", // Access phone from address object
+        email: user?.email ?? "",
+        deliveryAddress: order.deliveryAddress ?? "" // Assuming delivery address is stored
+      },
+      items: itemsWithDetails,
+      subtotal: itemsWithDetails.reduce((sum, item) => sum + item.totalPrice, 0), // Calculate subtotal
+      deliveryFee: order.deliveryFee, // Assuming you have this field
+      discount: order.discountAmount, // Assuming you have this field
+      totalAmount: order.totalAmount,
+      payment: {
+        method: "Paystack", // Or determine dynamically if needed
+        status: order.status, // Use the updated status
+        transactionReference: order.paymentReference ?? ""
+      },
+      branch: {
+        id: branch?._id ?? "",
+        name: branch?.name ?? "Unknown Branch"
+      }
+      // Add any other relevant fields required by the PHP system
+    };
+  },
+});
+
+// Internal mutation for webhook to update status without admin check
 export const internalUpdateOrderStatusFromWebhook = internalMutation({
   args: {
     orderId: v.id("orders"),
@@ -95,6 +151,62 @@ export const internalUpdateOrderStatusFromWebhook = internalMutation({
     try {
       await ctx.db.patch(orderId, patchData);
       console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Order ${orderId} status updated to ${status}${paymentReference ? ` with payment ref ${paymentReference}` : ''} by webhook.`);
+
+      // --- START: Integration Call to PHP System ---
+      // Only send if the status indicates a confirmed/paid order (e.g., 'Received')
+      if (status === 'Received') {
+        // TODO: Replace with actual environment variable retrieval
+        const phpApiUrl = process.env.PHP_MANAGEMENT_API_URL;
+        const phpApiSecret = process.env.PHP_MANAGEMENT_API_SECRET;
+
+        if (!phpApiUrl || !phpApiSecret) {
+          console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] PHP API URL or Secret not configured for order ${orderId}. Skipping integration call.`);
+        } else {
+          try {
+            // Fetch full order details using the internal query
+            const orderPayload = await ctx.runQuery(internal.orders.internalGetOrderDetailsForApi, { orderId });
+
+            if (!orderPayload) {
+              console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Failed to fetch order details for API payload for order ${orderId}. Skipping integration call.`);
+            } else {
+              const payloadString = JSON.stringify(orderPayload);
+
+              // TODO: Implement HMAC signature generation if required by PHP system
+              // Example (using Web Crypto API available in Convex actions/mutations):
+              // const enc = new TextEncoder();
+              // const key = await crypto.subtle.importKey("raw", enc.encode(phpApiSecret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+              // const signatureBuffer = await crypto.subtle.sign("HMAC", key, enc.encode(payloadString));
+              // const signatureHex = [...new Uint8Array(signatureBuffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+
+              console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Sending order ${orderId} to PHP API: ${phpApiUrl}`);
+
+              const response = await fetch(phpApiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  // TODO: Add Authorization header (e.g., Bearer token) or custom signature header
+                  // 'Authorization': `Bearer ${phpApiSecret}`, // Example if using a simple bearer token
+                  // 'X-Webhook-Signature': signatureHex, // Example if using HMAC signature
+                },
+                body: payloadString,
+              });
+
+              if (!response.ok) {
+                const errorBody = await response.text();
+                console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Error sending order ${orderId} to PHP API (${response.status}): ${errorBody}`);
+                // TODO: Add more robust error handling (e.g., mark order for retry?)
+              } else {
+                console.log(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Successfully sent order ${orderId} to PHP API.`);
+              }
+            }
+          } catch (apiCallError) {
+            console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Failed to send order ${orderId} to PHP API:`, apiCallError);
+            // TODO: Add more robust error handling
+          }
+        }
+      }
+      // --- END: Integration Call to PHP System ---
+
     } catch (patchError) {
       console.error(`[CONVEX internalM(orders:internalUpdateOrderStatusFromWebhook)] Error patching order ${orderId} with data ${JSON.stringify(patchData)}:`, patchError);
       throw new Error(`Failed to patch order: ${patchError instanceof Error ? patchError.message : String(patchError)}`);

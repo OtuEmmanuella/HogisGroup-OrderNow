@@ -315,7 +315,9 @@ export default function CheckoutPage() {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
-    }).format(amountKobo / 100); // Convert kobo to Naira
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountKobo / 100);
   };
 
   // Helper function to parse pickup time string into timestamp

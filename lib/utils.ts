@@ -14,19 +14,13 @@ export function cn(...inputs: ClassValue[]) {
  */
 export const formatCurrency = (amountKobo: number | null | undefined): string => {
   if (amountKobo === null || amountKobo === undefined || isNaN(amountKobo)) {
-    // Return empty string or a placeholder like "N/A" if the input is invalid
     return ""; 
   }
-  // Divide by 100 to convert kobo/cents to Naira/dollars
-  const amountNaira = amountKobo / 100;
+  const amountNaira = Math.round(amountKobo / 100);
   return new Intl.NumberFormat('en-NG', { 
     style: 'currency', 
-    currency: 'NGN', 
-    // minimumFractionDigits: 2, // Ensure two decimal places
-    // maximumFractionDigits: 2 
+    currency: 'NGN',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   }).format(amountNaira);
 };
-
-// export function useStorageUrl(storageId: Id<"_storage"> | undefined) {
-//   return useQuery(api.storage.getUrl, storageId ? { storageId } : "skip");
-// }

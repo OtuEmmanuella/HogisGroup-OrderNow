@@ -37,7 +37,14 @@ export default function CartDrawer() {
       console.log("[CartDrawer] Received isCartDrawerOpen:", isCartDrawerOpen);
   }, [isCartDrawerOpen]);
 
-  const displayTotal = (cartTotal / 100).toFixed(2);
+  const formatPrice = (amountKobo: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountKobo);
+  };
 
   return (
     <Drawer 
@@ -72,14 +79,12 @@ export default function CartDrawer() {
             <div className="divide-y divide-gray-100">
               {cartItems.map((item) => (
                 <div key={item._id} className="flex items-center py-4 gap-3">
-                  {/* Basic image placeholder - TODO: Enhance with actual image if available */}
                   <div className="w-14 h-14 bg-secondary rounded-md flex-shrink-0 relative overflow-hidden">
-                     {/* <Image src={item.imageUrl || '/images/placeholder-image.svg'} alt={item.name} fill className="object-cover" /> */}
-                     <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">IMG</div>
+                    <div className="h-full w-full flex items-center justify-center text-muted-foreground text-xs">IMG</div>
                   </div>
                   <div className="flex-grow">
                     <p className="font-medium text-sm mb-0.5 line-clamp-1">{item.name}</p>
-                    <p className="text-muted-foreground text-xs">₦{(item.price / 100).toFixed(2)}</p>
+                    <p className="text-muted-foreground text-xs">{formatPrice(item.price)}</p>
                   </div>
                   <div className="flex items-center gap-1.5 flex-shrink-0">
                     <Button 
@@ -118,7 +123,7 @@ export default function CartDrawer() {
           <DrawerFooter className="border-t bg-background mt-auto px-4 py-3">
             <div className="flex justify-between items-center mb-3">
               <span className="text-muted-foreground text-sm">Subtotal</span>
-              <span className="font-semibold text-lg">₦{displayTotal}</span>
+              <span className="font-semibold text-lg">{formatPrice(cartTotal)}</span>
             </div>
             <Button 
               asChild 
@@ -132,4 +137,4 @@ export default function CartDrawer() {
       </DrawerContent>
     </Drawer>
   );
-} 
+}

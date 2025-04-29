@@ -11,7 +11,7 @@ import { CartItem } from '@/hooks/useShoppingCart';
 
 export default function ShoppingCartDisplay() {
   const router = useRouter();
-
+  
   const {
     cartItems,
     cartTotal,
@@ -19,6 +19,15 @@ export default function ShoppingCartDisplay() {
     decrementItem,
     clearCart,
   } = useOrderContext();
+
+  const formatPrice = (amountKobo: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountKobo);
+  };
 
   const handleCheckout = () => {
     router.push('/checkout');
@@ -49,7 +58,7 @@ export default function ShoppingCartDisplay() {
               <div>
                 <p className="font-medium">{item.name}</p>
                 <p className="text-sm text-muted-foreground">
-                  ${item.price.toFixed(2)}
+                  {formatPrice(item.price)}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -79,7 +88,7 @@ export default function ShoppingCartDisplay() {
       <CardFooter className="flex flex-col gap-4">
         <div className="flex justify-between w-full font-semibold">
           <span>Total:</span>
-          <span>${cartTotal.toFixed(2)}</span>
+          <span>{formatPrice(cartTotal)}</span>
         </div>
         <Button
           className="w-full"
@@ -99,4 +108,4 @@ export default function ShoppingCartDisplay() {
       </CardFooter>
     </Card>
   );
-} 
+}

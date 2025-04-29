@@ -12,7 +12,16 @@ export default function MobileCartBar() {
   const { openCartDrawer } = useUIContext();
   const uniqueId = useId();
 
-  const displayTotal = (cartTotal / 100).toFixed(2);
+  const formatPrice = (amountKobo: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amountKobo);
+  };
+
+  const displayTotal = formatPrice(cartTotal);
 
   // Function to handle click
   const handleOpenDrawer = () => {
@@ -51,10 +60,10 @@ export default function MobileCartBar() {
           <span className="text-sm font-medium">View Your Cart</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-base font-semibold">₦{displayTotal}</span>
+          <span className="text-base font-semibold">{displayTotal}</span>
           <ChevronUp size={18} />
         </div>
       </Button>
     </div>
   );
-} 
+}
