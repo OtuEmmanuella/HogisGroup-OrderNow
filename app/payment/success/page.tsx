@@ -45,7 +45,7 @@ export default function PaymentSuccessPage() {
             <Link href="/home">
               <Button variant="outline" size="lg">Back to Home</Button>
             </Link>
-            <Link href="/orders">
+            <Link href="/profile">
               <Button variant="outline" size="lg">View Orders</Button>
             </Link>
           </div>
