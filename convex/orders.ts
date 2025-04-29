@@ -338,7 +338,7 @@ export const createOrder = mutation({
          console.warn("[CONVEX M(orders:createOrder)] Take-out order created without pickup time.");
         // throw new Error("Pickup time is required for take-out orders.");
     }
-    if (args.orderType === 'Dine-In' && (!args.dineInDateTime || args.dineInGuests || !args.dineInReservationType)) {
+    if (args.orderType === 'Dine-In' && (!args.dineInDateTime || !args.dineInGuests || !args.dineInReservationType)) {
          console.warn("[CONVEX M(orders:createOrder)] Dine-In order created without required details (Date/Time, Guests, Type).");
          // Depending on strictness, could throw Error here
          // throw new Error("Date/Time, number of guests, and reservation type are required for Dine-In orders.");
