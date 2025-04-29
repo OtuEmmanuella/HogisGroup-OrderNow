@@ -85,42 +85,42 @@ const businesses = [
 // Team members data
 const teamMembers = [
   {
-    name: "Paul Francis",
-    position: "Managing Director",
-    image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=2070&auto=format&fit=crop",
+    name: "Dr Ikechukwu Ukweh(MBA,FMCPH,PhD)",
+    position: "Group Managing Director",
+    image: "/images/gmd.png",
     linkedin: "#",
     twitter: "#",
   },
-  {
-    name: "Emmanuella",
-    position: "Deputy Managing Director",
-    image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=2076&auto=format&fit=crop",
-    linkedin: "#",
-    twitter: "#",
-  },
+  // {
+  //   name: "",
+  //   position: "Deputy Managing Director",
+  //   image: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=2076&auto=format&fit=crop",
+  //   linkedin: "#",
+  //   twitter: "#",
+  // },
 ]
 
 // Location data for the branches
 const locations = [
   {
     id: 1,
-    name: "Hogis Marina Resort",
-    address: "Marina Waterfront, Calabar",
-    image: "https://images.unsplash.com/photo-1564501049412-61c2a3083791?q=80&w=2832&auto=format&fit=crop",
+    name: "Hogis Luxury Suites Branch",
+    address: "7 Akim Cl, Housing Estate Rd, Calabar",
+    image: "https://hogisgroup.com/img/4.jpg",
     rating: 4.9,
   },
   {
     id: 2,
-    name: "Hogis Luxury Suites",
-    address: "Diamond Hill, Calabar",
-    image: "https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?q=80&w=2070&auto=format&fit=crop",
+    name: "Hogis Royale & Apartment Branch",
+    address: "State Housing Estate, 6 Bishop Moynagh Ave, Calabar",
+    image: "https://hogisgroup.com/img/IMG_3687.JPG",
     rating: 4.8,
   },
   {
     id: 3,
-    name: "Hogis Grand",
-    address: "Central Business District, Calabar",
-    image: "https://images.unsplash.com/photo-1455587734955-081b22074882?q=80&w=2070&auto=format&fit=crop",
+    name: "Hogis Exclusive Suites Branch",
+    address: "E1 Estate Lemna Rd, Atekong, Calabar",
+    image: "https://hogisgroup.com/img/41x34.5%20b.png",
     rating: 4.7,
   },
 ]
@@ -233,17 +233,16 @@ const AboutUsClient = () => {
       <section ref={heroRef} className="relative min-h-screen flex items-center justify-center overflow-hidden">
         {/* Parallax Background */}
         <motion.div
-          className="absolute inset-0 z-0"
-          style={{
-            backgroundImage:
-              "url(https://images.unsplash.com/photo-1571896349842-33c89424de2d?q=80&w=2160&auto=format&fit=crop)",
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            opacity,
-            y,
-            scale,
-          }}
-        >
+  className="absolute inset-0 z-0"
+  style={{
+    backgroundImage: 'url(https://hogisgroup.com/img/IMG_3687.JPG)',
+    backgroundSize: "cover",
+    backgroundPosition: "center",
+    opacity,
+    y,
+    scale,
+  }}
+>
           <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-hotel-dark" />
         </motion.div>
 
@@ -517,7 +516,7 @@ const AboutUsClient = () => {
                       src={member.image || "/placeholder.svg"}
                       alt={member.name}
                       fill
-                      className="object-cover object-center transition-transform duration-700 group-hover:scale-110"
+                      className="object-contain object-center transition-transform duration-700 group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end">
                       <div className="p-6 w-full">

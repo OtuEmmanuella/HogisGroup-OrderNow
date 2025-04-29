@@ -1,0 +1,28 @@
+# Global rules
+User-agent: *
+Allow: /
+Allow: /about
+Allow: /home
+Allow: /start-ordering
+Allow: /images/
+Allow: /fonts/
+Allow: /sitemap.xml
+
+# Prevent indexing of sensitive routes
+Disallow: /admin/
+Disallow: /api/
+Disallow: /(admin)/
+Disallow: /sign-in
+Disallow: /sign-up
+Disallow: /auth-callback
+Disallow: /checkout
+Disallow: /payment/
+Disallow: /payment-confirmation/
+Disallow: /webhooks/
+Disallow: /_next/
+
+# Add crawl-delay for rate limiting
+Crawl-delay: 10
+
+# Sitemap location
+Sitemap: https://ordernow.hogisgroup.com/sitemap.xml

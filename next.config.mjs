@@ -55,8 +55,6 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'res.cloudinary.com', // Add Cloudinary hostname
-        // port: '', // Optional
-        // pathname: '/**', // Optional: Allow any path, or be more specific if desired
       },
       {
         protocol: 'https',
@@ -66,7 +64,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'unsplash.com',
       },
-      // Add other domains if needed
+      {
+        protocol: 'https',
+        hostname: 'hogisgroup.com', // Added Hogis Group domain
+      }
     ],
   },
 };

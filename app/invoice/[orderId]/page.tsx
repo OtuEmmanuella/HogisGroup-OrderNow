@@ -37,13 +37,15 @@ interface InvoiceData {
     name?: string | null;
     email?: string | null;
   };
-  deliveryAddress?: { 
-    street: string; 
-    customerPhone: string;
-    recipientName?: string;
-    recipientPhone?: string;
-  };
+  deliveryAddress?: DeliveryAddress;
   notes?: string;
+}
+
+interface DeliveryAddress {
+  street: string; 
+  customerPhone: string;
+  recipientName?: string;
+  recipientPhone?: string;
 }
 
 const VAT_RATE = 0.075; // 7.5% VAT for Nigeria
