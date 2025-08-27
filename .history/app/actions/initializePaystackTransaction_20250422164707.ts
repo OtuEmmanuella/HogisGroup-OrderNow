@@ -54,7 +54,7 @@ export async function initializePaystackTransaction({
   if (typeof order.totalAmount !== 'number' || order.totalAmount < 0) {
       throw new Error("Invalid order total amount.");
   }
-  const amountInKobo = Math.round(order.totalAmount);
+  const amountInKobo = Math.round(order.totalAmount * 100);
    if (amountInKobo <= 0) {
        throw new Error("Order total must be positive to initiate payment.");
    }

@@ -164,42 +164,20 @@ function MenuCategorySection({ categoryId, categoryName, onAddToCart, isAddingTo
           transition={{ duration: 0.3, ease: "easeInOut" }}
         >
           {isMobile ? (
-            isExpanded ? (
-              // Expanded mobile view: Use a grid layout
-              <motion.div
-                key="mobile-expanded-grid" // Unique key for AnimatePresence
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.3, ease: "easeInOut" }}
-                className="grid grid-cols-2 gap-3 md:gap-4" // Same grid as non-mobile, or adjust as needed
-              >
+            <ScrollArea className="w-full whitespace-nowrap rounded-md pb-2">
+              <div className="flex space-x-3">
                 {itemsToDisplay.map((item) => (
-                  <MenuItemCard
-                    key={item._id}
-                    item={item}
-                    onAddToCart={onAddToCart}
-                    isAddingToCart={isAddingToCart(item._id)}
-                  />
+                  <div key={item._id} className="w-40 flex-shrink-0">
+                    <MenuItemCard
+                      item={item}
+                      onAddToCart={onAddToCart}
+                      isAddingToCart={isAddingToCart(item._id)}
+                    />
+                  </div>
                 ))}
-              </motion.div>
-            ) : (
-              // Collapsed mobile view: Use horizontal scroll
-              <ScrollArea className="w-full whitespace-nowrap rounded-md pb-2">
-                <div className="flex space-x-3">
-                  {itemsToDisplay.map((item) => (
-                    <div key={item._id} className="w-40 flex-shrink-0">
-                      <MenuItemCard
-                        item={item}
-                        onAddToCart={onAddToCart}
-                        isAddingToCart={isAddingToCart(item._id)}
-                      />
-                    </div>
-                  ))}
-                </div>
-                <ScrollBar orientation="horizontal" />
-              </ScrollArea>
-            )
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           ) : (
             <motion.div
               initial={false}
