@@ -26,7 +26,7 @@ const CartButtonContent = () => {
   }, []);
 
   return (
-    <div className="relative p-2 text-gray-700 hover:text-[#F96521] transition">
+    <div className="relative p-1 text-gray-700 hover:text-[#F96521] transition">
       <ShoppingBag size={20} />
       {/* Only render badge if isClient and totalItems > 0 */}
       {isClient && totalItems > 0 && (

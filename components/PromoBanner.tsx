@@ -36,7 +36,7 @@ export function PromoBanner({ banners, isLoading = false, className }: PromoBann
     return (
       <div className={cn(
         "relative w-full overflow-hidden flex items-center justify-center bg-muted rounded-lg",
-        isMobile ? "h-24" : "h-48",
+        isMobile ? "h-24" : "h-45",
         className
       )}>
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
