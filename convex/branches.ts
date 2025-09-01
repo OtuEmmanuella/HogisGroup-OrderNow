@@ -112,23 +112,23 @@ const initialBranches: InitialBranchData[] = [
     address: "7 Akim Cl, Housing Estate Rd, Calabar", 
     operatingHours: "Dine-In/Take-out: 24 Hours; Delivery: Daily until 9pm", 
     supportedOrderTypes: ["Delivery", "Dine-In", "Take-out"],
-    contactNumber: "+234-123-456-7890",
+    contactNumber: "+234-809-990-3335",
     isActive: true
   },
   {
     name: "Hogis Royale & Apartment Branch",
     address: "State Housing Estate, 6 Bishop Moynagh Ave, Calabar", 
     operatingHours: "Dine-In/Take-out: 24 Hours; Delivery: Daily until 9pm",   
-    supportedOrderTypes: ["Delivery", "Take-out"],
-    contactNumber: "+234-123-456-7891",
+    supportedOrderTypes: ["Delivery", "Dine-In", "Take-out"],
+    contactNumber: "+234-707-353-6464",
     isActive: true
   },
   {
-    name: "Hogis Exclusive Suites Branch",
-    address: "E1 Estate Lemna Rd, Atekong, Calabar",
-    operatingHours: "Dine-In/Take-out: 24 Hours",      
-    supportedOrderTypes: ["Dine-In", "Take-out"],
-    contactNumber: "+234-123-456-7892",
+    name: "Hogis King's Court Branch",
+    address: "1 Akim Cl, Housing Estate Rd, Calabar",
+    operatingHours: "Dine-In/Take-out: 24 Hours; Delivery: Daily until 9pm",   
+    supportedOrderTypes: ["Delivery", "Dine-In", "Take-out"],
+    contactNumber: "+234-913-788-0161",
     isActive: true
   },
 ];

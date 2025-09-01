@@ -17,9 +17,12 @@ import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Users, User, Share2, CreditCard, DollarSign } from 'lucide-react';
 
 type OnboardingStep = 'welcome' | 'selectBranch' | 'selectOrderType' | 'selectOrderTypeForCart';
 type PaymentMode = 'split' | 'payAll';
+type OrderingMode = 'individual' | 'group';
 
 export default function StartOrderingPage() {
   const [step, setStep] = useState<OnboardingStep>(() => {
@@ -31,6 +34,8 @@ export default function StartOrderingPage() {
     return 'welcome';
   });
   const [selectedBranch, setSelectedBranch] = useState<Id<'branches'> | null>(null);
+  const [selectedOrderType, setSelectedOrderType] = useState<OrderType | null>(null);
+  const [orderingMode, setOrderingMode] = useState<OrderingMode>('individual');
   const [selectedPaymentMode, setSelectedPaymentMode] = useState<PaymentMode>('split');
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [isCreatingCart, setIsCreatingCart] = useState(false);
@@ -43,7 +48,9 @@ export default function StartOrderingPage() {
 
   useEffect(() => {
     setSelectedBranch(null);
+    setSelectedOrderType(null);
     setStep('welcome');
+    setOrderingMode('individual');
     setSelectedPaymentMode('split');
     setInviteCodeInput('');
   }, [setGlobalBranchId, setGlobalOrderType]);
@@ -63,28 +70,46 @@ export default function StartOrderingPage() {
       setStep('selectBranch');
       return;
     }
-    try {
-      await setGlobalBranchId(selectedBranch);
-      await setGlobalOrderType(orderType);
-      router.push('/home');
-    } catch (error) {
-      console.error('Error setting order type:', error);
-      toast.error("Failed to set order type. Please try again.");
-    }
+
+    // Just set the selected order type, don't proceed yet
+    setSelectedOrderType(orderType);
   };
 
-  const handleStartGroupOrder = async () => {
-    if (!selectedBranch) {
-      toast.error("Please select a branch first.");
-      setStep('selectBranch');
-      return;
-    }
-    if (!isSignedIn) {
-      toast.info("Please sign in to start a group order.");
+  const handleContinueToOrder = async () => {
+    if (!selectedBranch || !selectedOrderType) {
+      toast.error("Please select a branch and order type first.");
       return;
     }
 
-    setStep('selectOrderTypeForCart');
+    // Handle individual orders
+    if (orderingMode === 'individual') {
+      try {
+        await setGlobalBranchId(selectedBranch);
+        await setGlobalOrderType(selectedOrderType);
+        router.push('/home');
+      } catch (error) {
+        console.error('Error setting order type:', error);
+        toast.error("Failed to set order type. Please try again.");
+      }
+      return;
+    }
+
+    // Handle group orders
+    if (orderingMode === 'group') {
+      if (!isSignedIn) {
+        // Store the order details and redirect to sign in
+        localStorage.setItem('pendingGroupOrder', JSON.stringify({
+          branchId: selectedBranch,
+          orderType: selectedOrderType,
+          paymentMode: selectedPaymentMode
+        }));
+        toast.info("Please sign in to start a group order.");
+        router.push('/sign-in?redirect_url=/auth-callback');
+        return;
+      }
+
+      await handleCreateCart(selectedOrderType);
+    }
   };
 
   const handleJoinCart = async () => {
@@ -94,6 +119,7 @@ export default function StartOrderingPage() {
     }
     if (!isSignedIn) {
       localStorage.setItem('inviteCode', inviteCodeInput.trim());
+      toast.info("Please sign in to join the group order.");
       window.location.href = `/sign-in?redirect_url=/auth-callback`;
       return;
     }
@@ -139,7 +165,6 @@ export default function StartOrderingPage() {
       toast.error(`Failed to create group order: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsCreatingCart(false);
-      setStep('welcome');
     }
   };
 
@@ -202,33 +227,79 @@ export default function StartOrderingPage() {
 
             <Image src={logo} alt="Hogis Logo" width={120} height={120} className="mb-4" />
             <h1 className="text-3xl md:text-4xl font-bold mb-3">Welcome to Hogis OrderNow</h1>
-            <p className="text-muted-foreground mb-8 max-w-md">
-              Ready for some delicious food? Let&apos;s get your order started quickly.
+            <p className="text-muted-foreground mb-6 max-w-md">
+              Order individually or with friends! Split bills, share costs, or treat the group.
             </p>
-            <Button size="lg" onClick={() => setStep('selectBranch')} className="mb-8 bg-[#F96521] hover:bg-[#e05a19]">
-              Get Started
-            </Button>
 
-            <div className="w-full border-t pt-6 mt-6">
-              <h3 className="text-lg font-medium mb-3">Have an Invite Code?</h3>
-              <div className="flex gap-2 justify-center">
-                <Input
-                  type="text"
-                  placeholder="Enter invite code"
-                  value={inviteCodeInput}
-                  onChange={(e) => setInviteCodeInput(e.target.value)}
-                  className="max-w-xs"
-                  disabled={isJoiningCart}
-                />
-                <Button
-                  variant="secondary"
-                  onClick={handleJoinCart}
-                  disabled={isJoiningCart || !inviteCodeInput.trim()}
-                >
-                  {isJoiningCart ? "Joining..." : "Join Cart"}
-                </Button>
+            {/* Feature highlights */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6 w-full max-w-md">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4 text-[#F96521]" />
+                <span>Personal orders</span>
               </div>
-              {!isSignedIn && <p className="text-sm text-muted-foreground mt-2">Sign in to join a cart.</p>}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Users className="w-4 h-4 text-[#F96521]" />
+                <span>Group orders</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <CreditCard className="w-4 h-4 text-[#F96521]" />
+                <span>Split bills easily</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <DollarSign className="w-4 h-4 text-[#F96521]" />
+                <span>Pay for friends</span>
+              </div>
+            </div>
+            
+            <div className="w-full space-y-4">
+              <Button size="lg" onClick={() => setStep('selectBranch')} className="w-full bg-[#F96521] hover:bg-[#e05a19]">
+                Start Ordering
+              </Button>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              <Card className="w-full">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Share2 className="w-5 h-5" />
+                    Join Group Order
+                  </CardTitle>
+                  <CardDescription>
+                    Have an invite code? Join your friends' order
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex gap-2">
+                    <Input
+                      type="text"
+                      placeholder="Enter invite code"
+                      value={inviteCodeInput}
+                      onChange={(e) => setInviteCodeInput(e.target.value)}
+                      className="flex-1"
+                      disabled={isJoiningCart}
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={handleJoinCart}
+                      disabled={isJoiningCart || !inviteCodeInput.trim()}
+                    >
+                      {isJoiningCart ? "Joining..." : "Join"}
+                    </Button>
+                  </div>
+                  {!isSignedIn && (
+                    <p className="text-sm text-muted-foreground mt-2 text-center">
+                      You'll be prompted to sign in after entering the code
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
             </div>
           </motion.div>
         )}
@@ -242,27 +313,6 @@ export default function StartOrderingPage() {
           >
             <h2 className="text-2xl font-semibold text-center mb-6">First, select your branch</h2>
             <BranchSelector onSelectBranch={handleBranchSelect} />
-            <div className="w-full border-t pt-6 mt-8 text-center">
-              <h3 className="text-lg font-medium mb-3">Have an Invite Code?</h3>
-              <div className="flex gap-2 justify-center">
-                <Input
-                  type="text"
-                  placeholder="Enter invite code"
-                  value={inviteCodeInput}
-                  onChange={(e) => setInviteCodeInput(e.target.value)}
-                  className="max-w-xs"
-                  disabled={isJoiningCart}
-                />
-                <Button
-                  variant="secondary"
-                  onClick={handleJoinCart}
-                  disabled={isJoiningCart || !inviteCodeInput.trim()}
-                >
-                  {isJoiningCart ? "Joining..." : "Join Cart"}
-                </Button>
-              </div>
-              {!isSignedIn && <p className="text-sm text-muted-foreground mt-2">Sign in to join a cart.</p>}
-            </div>
           </motion.div>
         )}
 
@@ -271,89 +321,181 @@ export default function StartOrderingPage() {
           <motion.div
             key="selectOrderType"
             {...animationProps}
-            className="w-full max-w-2xl"
+            className="w-full max-w-4xl space-y-8"
           >
-            <h2 className="text-2xl font-semibold text-center mb-6">How would you like your order?</h2>
-            <OrderTypeSelector selectedType={null} onSelectType={handleOrderTypeSelect} />
+            <div>
+              <h2 className="text-2xl font-semibold text-center mb-6">How would you like your order?</h2>
+              <div className="w-full max-w-4xl mx-auto">
+                <OrderTypeSelector 
+                  selectedType={selectedOrderType} 
+                  onSelectType={handleOrderTypeSelect} 
+                />
+              </div>
+            </div>
 
-            <div className="mt-8 text-center border-t pt-6">
-              <h3 className="text-lg font-medium mb-4">Ordering with Friends?</h3>
-              {isSignedIn ? (
-                <>
-                  <RadioGroup
-                    defaultValue="split"
-                    value={selectedPaymentMode}
-                    onValueChange={(value) => setSelectedPaymentMode(value as PaymentMode)}
-                    className="flex justify-center gap-6 mb-6"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="split" id="split" />
-                      <Label htmlFor="split">Split Payment (Everyone pays their share)</Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="payAll" id="payAll" />
-                      <Label htmlFor="payAll">Initiator Pays All</Label>
-                    </div>
-                  </RadioGroup>
-
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    onClick={handleStartGroupOrder}
-                    disabled={isCreatingCart}
-                    className="mb-6"
-                  >
-                    {isCreatingCart ? "Starting..." : "Start Group Order"}
-                  </Button>
-
-                  <div className="w-full border-t pt-6">
-                    <h3 className="text-lg font-medium mb-3">Or Join with Invite Code?</h3>
-                    <div className="flex gap-2 justify-center">
-                      <Input
-                        type="text"
-                        placeholder="Enter invite code"
-                        value={inviteCodeInput}
-                        onChange={(e) => setInviteCodeInput(e.target.value)}
-                        className="max-w-xs"
-                        disabled={isJoiningCart}
-                      />
-                      <Button
-                        variant="secondary"
-                        onClick={handleJoinCart}
-                        disabled={isJoiningCart || !inviteCodeInput.trim()}
-                      >
-                        {isJoiningCart ? "Joining..." : "Join Cart"}
-                      </Button>
+            {/* Always show ordering mode selection */}
+            {selectedOrderType && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                transition={{ duration: 0.3 }}
+                className="border-t pt-6 overflow-hidden"
+              >
+                <h3 className="text-xl font-medium text-center mb-2">Choose your ordering experience</h3>
+                <p className="text-center text-muted-foreground mb-6">
+                  Order by yourself or create a group order to split bills or pay for everyone
+                </p>
+                
+                <RadioGroup
+                  value={orderingMode}
+                  onValueChange={(value) => setOrderingMode(value as OrderingMode)}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 items-start"
+                >
+                  <div className="relative">
+                    <RadioGroupItem value="individual" id="individual" className="peer sr-only" />
+                    {/* Gradient border container */}
+                    <div 
+                      className={`absolute inset-0 rounded-lg transition-opacity duration-200 ${
+                        orderingMode === 'individual' 
+                          ? 'bg-gradient-to-r from-[#F9A825] to-[#F9A835] opacity-100' 
+                          : 'opacity-0'
+                      }`}
+                    />
+                    {/* Inner content with padding to show border */}
+                    <div className={`relative ${orderingMode === 'individual' ? 'p-0.5' : ''}`}>
+                      <Label htmlFor="individual" className="cursor-pointer">
+                        <Card className={`transition-all hover:bg-gray-50 h-auto ${
+                          orderingMode === 'individual' 
+                            ? 'bg-white border-transparent shadow-md' 
+                            : 'border-gray-200'
+                        }`}>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <User className="w-5 h-5" />
+                              Order for Myself
+                            </CardTitle>
+                            <CardDescription>
+                              Quick individual order with instant checkout
+                            </CardDescription>
+                          </CardHeader>
+                        </Card>
+                      </Label>
                     </div>
                   </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-muted-foreground mb-4">Sign in to start or join a group order.</p>
-                  <Button variant="outline" size="lg" onClick={() => router.push('/sign-in')}>
-                    Sign in
-                  </Button>
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
 
-        {/* Select Order Type for Cart Step */}
-        {step === 'selectOrderTypeForCart' && (
-          <motion.div
-            key="selectOrderTypeForCart"
-            {...animationProps}
-            className="w-full max-w-2xl"
-          >
-            <h2 className="text-2xl font-semibold text-center mb-6">
-              How would you like your order for the group cart?
-            </h2>
-            <OrderTypeSelector
-              selectedType={null}
-              isCreatingCart={isCreatingCart}
-              onSelectType={handleCreateCart}
-            />
+                  <div className="relative">
+                    <RadioGroupItem value="group" id="group" className="peer sr-only" />
+                    {/* Gradient border container */}
+                    <div 
+                      className={`absolute inset-0 rounded-lg transition-opacity duration-200 ${
+                        orderingMode === 'group' 
+                          ? 'bg-gradient-to-r from-[#F9A825] to-[#F9A835] opacity-100' 
+                          : 'opacity-0'
+                      }`}
+                    />
+                    {/* Inner content with padding to show border */}
+                    <div className={`relative ${orderingMode === 'group' ? 'p-0.5' : ''}`}>
+                      <Label htmlFor="group" className="cursor-pointer">
+                        <Card className={`transition-all hover:bg-gray-50 h-auto ${
+                          orderingMode === 'group' 
+                            ? 'bg-white border-transparent shadow-md' 
+                            : 'border-gray-200'
+                        }`}>
+                          <CardHeader className="pb-3">
+                            <CardTitle className="text-lg flex items-center gap-2">
+                              <Users className="w-5 h-5" />
+                              Group Order
+                            </CardTitle>
+                            <CardDescription>
+                              Order with friends • Split bills or pay for everyone • Share invite codes
+                            </CardDescription>
+                          </CardHeader>
+                        </Card>
+                      </Label>
+                    </div>
+                  </div>
+                </RadioGroup>
+
+                {/* Group order details - always visible when group mode is selected */}
+                <AnimatePresence>
+                  {orderingMode === 'group' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="overflow-hidden mb-6"
+                    >
+                      <Card className="bg-orange-50 border-orange-200">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg text-orange-900 flex items-center gap-2">
+                            <CreditCard className="w-5 h-5" />
+                            Group Payment Options
+                          </CardTitle>
+                          <CardDescription className="text-orange-700">
+                            Perfect for office lunches, family meals, or hanging out with friends!
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <RadioGroup
+                            value={selectedPaymentMode}
+                            onValueChange={(value) => setSelectedPaymentMode(value as PaymentMode)}
+                            className="space-y-3"
+                          >
+                            <div className="flex items-start space-x-3 p-3 rounded-lg border bg-white">
+                              <RadioGroupItem value="split" id="split" className="mt-0.5" />
+                              <div className="flex-1">
+                                <Label htmlFor="split" className="font-medium cursor-pointer flex items-center gap-2">
+                                  <CreditCard className="w-4 h-4" />
+                                  Split Payment
+                                </Label>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  Everyone pays for their own items • Perfect for office orders
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-start space-x-3 p-3 rounded-lg border bg-white">
+                              <RadioGroupItem value="payAll" id="payAll" className="mt-0.5" />
+                              <div className="flex-1">
+                                <Label htmlFor="payAll" className="font-medium cursor-pointer flex items-center gap-2">
+                                  <DollarSign className="w-4 h-4" />
+                                  I'll Pay for Everyone
+                                </Label>
+                                <p className="text-sm text-muted-foreground mt-1">
+                                  You cover the entire group order • Great for treating friends
+                                </p>
+                              </div>
+                            </div>
+                          </RadioGroup>
+
+                          {!isSignedIn && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+                              <p className="text-sm text-blue-800">
+                                💡 <strong>Sign in required:</strong> You'll be prompted to sign in before creating the group order
+                              </p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Continue button */}
+                <div className="flex justify-center">
+                  <Button
+                    size="lg"
+                    onClick={handleContinueToOrder}
+                    disabled={isCreatingCart || !selectedOrderType || !orderingMode}
+                    className="bg-[#F96521] hover:bg-[#e05a19] min-w-48 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isCreatingCart ? "Creating Group Order..." : 
+                     orderingMode === 'group' ? "Create Group Order" : "Continue to Order"}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

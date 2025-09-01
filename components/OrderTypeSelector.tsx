@@ -12,18 +12,19 @@ interface OrderTypeSelectorProps {
   selectedType: OrderType | null;
   onSelectType: (type: OrderType) => void;
   isCreatingCart?: boolean;
+  className?: string;
 }
 
 const orderTypes: { type: OrderType; label: string; description: string }[] = [
   {
     type: 'Delivery',
     label: 'Delivery',
-    description: 'Get your order delivered to your doorstep.',
+    description: 'Freshly delivered to your doorstep',
   },
   {
     type: 'Take-out',
     label: 'Take-out / Pickup',
-    description: 'Collect your order from the branch.',
+    description: 'Quick and easy branch pickup.',
   },
   {
     type: 'Dine-In',
@@ -36,32 +37,47 @@ export default function OrderTypeSelector({
   selectedType,
   onSelectType,
   isCreatingCart,
+  className = '',
 }: OrderTypeSelectorProps) {
   // TODO: Filter orderTypes based on supportedTypes from the selected branch
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle>How would you like to get your order?</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {orderTypes.map(({ type, label, description }) => (
-            <Button
-              key={type}
-              variant={selectedType === type ? 'default' : 'outline'}
-              className="h-auto py-4 flex flex-col items-start text-left"
-              onClick={() => onSelectType(type)}
-              disabled={isCreatingCart}
-            >
-              <span className="font-semibold mb-1">{label}</span>
-              <span className="text-sm text-muted-foreground font-normal">
-                {description}
-              </span>
-            </Button>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+    <div className={className}>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {orderTypes.map(({ type, label, description }) => (
+          <div key={type} className="relative">
+            {/* Gradient border container */}
+            <div 
+              className={`absolute inset-0 rounded-md transition-opacity duration-200 ${
+                selectedType === type 
+                  ? 'bg-gradient-to-r from-[#F9A825] to-[#F9A835] opacity-100' 
+                  : 'opacity-0'
+              }`}
+            />
+            
+            {/* Inner content with padding to show border */}
+            <div className={`relative ${selectedType === type ? 'p-0.5' : ''}`}>
+              <Button
+                variant="outline"
+                className={`w-full h-auto py-6 px-4 flex flex-col items-start text-left relative overflow-hidden group transition-all duration-200 ${
+                  selectedType === type 
+                    ? 'bg-white border-transparent shadow-md' 
+                    : 'hover:bg-gray-50 border-gray-200'
+                }`}
+                onClick={() => onSelectType(type)}
+                disabled={isCreatingCart}
+              >
+                <div className="w-full">
+                  <span className="font-semibold text-base mb-2 block">{label}</span>
+                  <span className="text-sm font-normal text-muted-foreground block leading-relaxed">
+                    {description}
+                  </span>
+                </div>
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
-} 
+}
