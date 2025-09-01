@@ -16,11 +16,13 @@ export default function Page() {
   console.log("[SignIn Page] Effective Redirect URL for component:", effectiveRedirectUrl);
 
   return (
+      <div className="flex items-start justify-center min-h-screen pt-20 md:pt-40">
       <SignIn 
         // Use forceRedirectUrl for higher priority
         forceRedirectUrl={effectiveRedirectUrl}
         // Keep fallback as an ultimate backup 
         fallbackRedirectUrl="/home" 
        />
+    </div>
   );
 } 
