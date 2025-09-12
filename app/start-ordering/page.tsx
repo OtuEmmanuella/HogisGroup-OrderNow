@@ -40,7 +40,11 @@ export default function StartOrderingPage() {
   const [inviteCodeInput, setInviteCodeInput] = useState('');
   const [isCreatingCart, setIsCreatingCart] = useState(false);
   const [isJoiningCart, setIsJoiningCart] = useState(false);
-  const { setSelectedBranchId: setGlobalBranchId, setSelectedOrderType: setGlobalOrderType } = useOrderContext();
+  const { 
+    setSelectedBranchId: setGlobalBranchId, 
+    setSelectedOrderType: setGlobalOrderType,
+    setActiveSharedCartId 
+  } = useOrderContext();
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();
   const createSharedCart = useMutation(api.sharedCarts.createSharedCart);
@@ -127,7 +131,10 @@ export default function StartOrderingPage() {
     setIsJoiningCart(true);
     try {
       const result = await joinSharedCart({ inviteCode: inviteCodeInput.trim() });
+      // Set the active shared cart ID in the context
+      setActiveSharedCartId(result.cartId);
       toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
+      // Redirect to the shared cart page
       router.push(`/shared-cart/${result.cartId}`);
     } catch (error) {
       console.error("Failed to join shared cart:", error);

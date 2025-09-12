@@ -1,14 +1,16 @@
 "use client";
 
-import { SignInButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
+import { SignInButton, SignedIn, SignedOut, UserButton, useUser } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
 import logo from "@/images/logo.webp"
 import SearchBar from "./SearchBar";
-import { ShoppingBag, MapPin, Menu as MenuIcon, X, Users } from "lucide-react";
+import { ShoppingBag, MapPin, Menu as MenuIcon, X, Users, Copy, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useOrderContext } from "@/context/OrderContext";
 import { useUIContext } from "@/context/UIContext";
+import { useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "./ui/button";
@@ -42,6 +44,23 @@ function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { totalItems, activeSharedCartId } = useOrderContext(); // Get activeSharedCartId
   const { openCartDrawer } = useUIContext();
+  const [copied, setCopied] = useState(false);
+
+  const userSharedCarts = useQuery(api.sharedCarts.getUserSharedCarts);
+  const { user } = useUser();
+
+  // Find the user's own shared cart (the one they initiated)
+  const mySharedCart = userSharedCarts?.find(cart => cart && cart.initiatorId === user?.id);
+  const inviteCode = mySharedCart?.inviteCode;
+
+  const handleCopy = () => {
+    if (inviteCode) {
+      navigator.clipboard.writeText(inviteCode);
+      toast.success("Invite code copied!");
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000); // Reset after 2 seconds
+    }
+  };
 
   const changeLocationDisabled = !!activeSharedCartId; // Disable if in a shared cart
 
@@ -64,7 +83,20 @@ function Header() {
           </Link>
 
           {/* Desktop Navigation & Shared Cart Link */}
-          <nav className="hidden md:flex items-center gap-6">
+          <nav className="hidden md:flex items-center gap-4">
+            {/* Invite Code Display */}
+            <SignedIn>
+              {inviteCode && (
+                <div className="flex items-center gap-2 rounded-full bg-orange-100 border border-orange-200 px-3 py-1.5">
+                  <span className="text-xs font-medium text-orange-800">Your Invite Code:</span>
+                  <span className="text-sm font-bold text-orange-900 tracking-wider">{inviteCode}</span>
+                  <button onClick={handleCopy} className="p-1 rounded-full hover:bg-orange-200 transition-all duration-200" aria-label="Copy invite code">
+                    {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} className="text-orange-800" />}
+                  </button>
+                </div>
+              )}
+            </SignedIn>
+
             {/* Show Return to Group Order button if active */}
             {activeSharedCartId && (
                 <Link href={`/shared-cart/${activeSharedCartId}`} passHref>
@@ -181,6 +213,23 @@ function Header() {
                 transition={{ duration: 0.3, delay: 0.1, staggerChildren: 0.1 }}
                 className="flex flex-col space-y-3 py-3"
               >
+                {/* Invite Code for Mobile */}
+                <SignedIn>
+                  {inviteCode && (
+                    <div className="px-3 py-2">
+                      <div className="flex items-center justify-between gap-2 rounded-lg bg-orange-100 border border-orange-200 p-2">
+                        <div>
+                          <span className="text-xs font-medium text-orange-800">Your Invite Code</span>
+                          <p className="text-base font-bold text-orange-900 tracking-wider">{inviteCode}</p>
+                        </div>
+                        <Button onClick={handleCopy} size="sm" variant="ghost" className="h-auto px-2 py-1 text-orange-800 hover:bg-orange-200">
+                          {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+                          <span className="ml-2">{copied ? 'Copied!' : 'Copy'}</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </SignedIn>
                 {/* Mobile Return to Group Order Link */}
                 {activeSharedCartId && (
                     <Link

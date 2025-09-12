@@ -266,7 +266,8 @@ export default defineSchema({
     .index("by_cart", ["cartId"])
     .index("by_user", ["userId"])
     .index("by_cart_user", ["cartId", "userId"])
-    .index("by_cart_menuItem", ["cartId", "menuItemId"]),
+    .index("by_cart_menuItem", ["cartId", "menuItemId"])
+    .index("by_cart_user_item", ["cartId", "userId", "menuItemId"]),
   // <<< END SHARED CART TABLES >>>
 
   userActivity: defineTable({

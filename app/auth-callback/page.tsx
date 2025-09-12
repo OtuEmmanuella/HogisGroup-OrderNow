@@ -6,11 +6,13 @@ import { useAuth } from '@clerk/nextjs';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
+import { useOrderContext } from '@/context/OrderContext';
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const { isSignedIn, isLoaded } = useAuth();
   const joinSharedCart = useMutation(api.sharedCarts.joinSharedCart);
+  const { setActiveSharedCartId } = useOrderContext();
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -21,7 +23,10 @@ export default function AuthCallbackPage() {
     const joinCart = async (inviteCode: string) => {
       try {
         const result = await joinSharedCart({ inviteCode });
+        // Set the active shared cart ID in the context
+        setActiveSharedCartId(result.cartId); 
         toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
+        // Redirect to the shared cart page
         router.push(`/shared-cart/${result.cartId}`);
       } catch (error) {
         console.error("Failed to join shared cart:", error);

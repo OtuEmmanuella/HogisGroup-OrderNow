@@ -10,7 +10,7 @@ import {
 } from "./_generated/server";
 import { Id, Doc } from "./_generated/dataModel";
 import { getUserFromAuth } from "./lib/getUserFromAuth"; // Helper to get Clerk user
-import { api } from "./_generated/api"; // Import the generated API object
+import { api, internal } from "./_generated/api"; // Import the generated API object
 
 // --- Helper Functions ---
 
@@ -211,9 +211,9 @@ export const addSharedCartItem = mutation({
 });
 
 /**
- * Removes an item from a shared cart.
- * Only the user who added the item or the cart initiator can remove it.
- * Cart must be in 'open' status.
+ * Updates an item's quantity or removes it from a shared cart.
+ * Only the user who added the item can modify it.
+ * A negative quantity indicates a decrement.
  */
 export const removeSharedCartItem = mutation({
   args: {
@@ -222,41 +222,82 @@ export const removeSharedCartItem = mutation({
   handler: async (ctx, args) => {
     const user = await getUserFromAuth(ctx);
     if (!user) {
-      throw new Error("Authentication required to remove items from a shared cart.");
+      throw new Error("Authentication required.");
     }
 
-    // Fetch the specific item to be removed
     const itemToRemove = await ctx.db.get(args.cartItemId);
     if (!itemToRemove) {
-      throw new Error("Item not found.");
+      // Even if item is not found, we can consider this a success to avoid user-facing errors on double-clicks
+      console.warn(`removeSharedCartItem: Item with ID ${args.cartItemId} not found.`);
+      return { success: true }; 
     }
 
-    // Fetch the cart
     const cart = await ctx.db.get(itemToRemove.cartId);
     if (!cart) {
-      // Should not happen if item exists, but good practice to check
-      throw new Error("Associated cart not found.");
+      throw new Error("Cart not found for the item.");
     }
 
-    // Check if cart is still open
     if (cart.status !== "open") {
       throw new Error("Cannot remove items from a cart that is not open.");
     }
 
-    // Check permissions: User must be the one who added the item OR the cart initiator
+    // Check permissions: user must be the one who added the item OR the cart initiator
     if (itemToRemove.userId !== user.userId && cart.initiatorId !== user.userId) {
-      throw new Error("Permission denied: You cannot remove this item.");
+      throw new Error("You do not have permission to remove this item.");
     }
 
     // Delete the item
     await ctx.db.delete(args.cartItemId);
 
-    // Recalculate and update the total amount
+    // Recalculate and update the cart total
     const newTotal = await calculateCartTotal(ctx.db, cart._id);
     await ctx.db.patch(cart._id, { totalAmount: newTotal });
 
-    // Optional: Schedule internal mutation if calculation is complex
-    // await ctx.scheduler.runAfter(0, internal.sharedCarts.updateCartTotal, { cartId: cart._id });
+    return { success: true };
+  },
+});
+
+
+export const updateSharedCartItem = mutation({
+  args: {
+    cartId: v.id("sharedCarts"),
+    menuItemId: v.id("menuItems"),
+    quantity: v.number(), // Can be positive (increment) or negative (decrement)
+  },
+  handler: async (ctx, args) => {
+    const user = await getUserFromAuth(ctx);
+    if (!user) {
+      throw new Error("Authentication required.");
+    }
+
+    const cart = await ctx.db.get(args.cartId);
+    if (!cart || cart.status !== "open") {
+      throw new Error("Cart is not open or does not exist.");
+    }
+
+    const existingItem = await ctx.db
+      .query("sharedCartItems")
+      .withIndex("by_cart_user_item", (q) =>
+        q.eq("cartId", args.cartId)
+         .eq("userId", user.userId)
+         .eq("menuItemId", args.menuItemId)
+      )
+      .first();
+
+    if (!existingItem) {
+      throw new Error("Item not found in cart.");
+    }
+
+    const newQuantity = existingItem.quantity + args.quantity;
+
+    if (newQuantity > 0) {
+      await ctx.db.patch(existingItem._id, { quantity: newQuantity });
+    } else {
+      await ctx.db.delete(existingItem._id);
+    }
+
+    const newTotal = await calculateCartTotal(ctx.db, args.cartId);
+    await ctx.db.patch(args.cartId, { totalAmount: newTotal });
 
     return { success: true };
   },
@@ -397,112 +438,107 @@ export const getSharedCart = query({
     cartId: v.id("sharedCarts"),
   },
   handler: async (ctx, args) => {
-    let user;
     try {
-      user = await getUserFromAuth(ctx); // Attempt to get user
-    } catch (error) {
-      // If getUserFromAuth throws (e.g., no identity), return null early.
-      // The frontend useQuery hook will handle this as loading/error or null data.
-      console.warn("getSharedCart: User not authenticated yet or error fetching identity.", error);
-      return null; // User not authenticated or error fetching identity
-    }
-    // If we reach here, 'user' is guaranteed to be non-null by the check in getUserFromAuth
-    // or the early return above.
+      let user;
+      try {
+        user = await getUserFromAuth(ctx); // Attempt to get user
+      } catch (error) {
+        console.warn("getSharedCart: User not authenticated yet or error fetching identity.", error);
+        return null; // User not authenticated or error fetching identity
+      }
 
-    // Verify user is a member
-    const member = await ctx.db
-      .query("sharedCartMembers")
-      .withIndex("by_cart_user", (q) =>
-        q.eq("cartId", args.cartId).eq("userId", user!.userId) // Safe to access user.userId
-      )
-      .first();
+      // Verify user is a member
+      const member = await ctx.db
+        .query("sharedCartMembers")
+        .withIndex("by_cart_user", (q) =>
+          q.eq("cartId", args.cartId).eq("userId", user!.userId)
+        )
+        .first();
 
-    if (!member) {
-      // User is authenticated but not a member of this specific cart.
-      console.warn(`getSharedCart: User ${user!.userId} is not a member of cart ${args.cartId}.`);
-      return null; // Return null to indicate access denied/not found for this user
-    }
+      if (!member) {
+        console.warn(`getSharedCart: User ${user!.userId} is not a member of cart ${args.cartId}.`);
+        return null;
+      }
 
-    // Fetch cart details
-    const cart = await ctx.db.get(args.cartId);
-    if (!cart) {
-      return null; // Or throw if cart must exist
-    }
+      // Fetch cart details
+      const cart = await ctx.db.get(args.cartId);
+      if (!cart) {
+        return null;
+      }
 
-    // Fetch members (consider fetching associated user names/details if needed)
-    const members = await ctx.db
-      .query("sharedCartMembers")
-      .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
-      .collect();
+      // Fetch members
+      const members = await ctx.db
+        .query("sharedCartMembers")
+        .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
+        .collect();
 
-    // Fetch items (consider fetching associated menu item names/images if needed)
-    const items = await ctx.db
-      .query("sharedCartItems")
-      .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
-      .collect();
+      // Fetch items
+      const items = await ctx.db
+        .query("sharedCartItems")
+        .withIndex("by_cart", (q) => q.eq("cartId", args.cartId))
+        .collect();
 
-    // Enrich items with menu item details
-    const itemsWithDetails = await Promise.all(
-      items.map(async (item) => {
-        let menuItem = null;
-        let name = "Unknown Item";
-        let imageUrl = undefined;
-        try {
-          menuItem = await ctx.db.get(item.menuItemId);
-          if (menuItem) {
-            name = menuItem.name ?? name;
-            imageUrl = menuItem.imageUrl;
+      // Enrich items with menu item details
+      const itemsWithDetails = await Promise.all(
+        items.map(async (item) => {
+          let menuItem = null;
+          let name = "Unknown Item";
+          let imageUrl = undefined;
+          try {
+            menuItem = await ctx.db.get(item.menuItemId);
+            if (menuItem) {
+              name = menuItem.name ?? name;
+              imageUrl = menuItem.imageUrl;
+            }
+          } catch (error) {
+            console.error(`Error fetching menu item ${item.menuItemId} for cart ${args.cartId}:`, error);
           }
-        } catch (error) {
-          console.error(`Error fetching menu item ${item.menuItemId} for cart ${args.cartId}:`, error);
-          // Keep default values
-        }
-        return {
-          ...item,
-          name: name,
-          imageUrl: imageUrl,
-          // Add other menuItem fields if needed
-        };
-      })
-    );
+          return {
+            ...item,
+            name,
+            imageUrl,
+          };
+        })
+      );
 
-    // Enrich members with user details (assuming a 'users' table indexed by Clerk's userId)
-    const membersWithDetails = await Promise.all(
-      members.map(async (member) => {
-        let userProfile = null;
-        let name = "Unknown User";
-        let imageUrl = undefined;
-        try {
-          userProfile = await ctx.db
-            .query("users")
-            .withIndex("by_user_id", (q) => q.eq("userId", member.userId))
-            .first(); // Assuming Clerk userId is unique in the users table
+      // Enrich members with user details
+      const membersWithDetails = await Promise.all(
+        members.map(async (member) => {
+          let userProfile = null;
+          let name = "Unknown User";
+          let imageUrl = undefined;
+          try {
+            userProfile = await ctx.db
+              .query("users")
+              .withIndex("by_user_id", (q) => q.eq("userId", member.userId))
+              .first();
 
-          if (userProfile) {
-            name = userProfile.name ?? name;
-            imageUrl = userProfile.imageUrl;
-            // Log the fetched profile to check for imageUrl
-            // console.log(`Fetched profile for member ${member.userId}:`, userProfile);
-          } else {
-            console.warn(`No user profile found for member ${member.userId} in cart ${args.cartId}`);
-          }
-        } catch (error) {
+            if (userProfile) {
+              name = userProfile.name ?? name;
+              imageUrl = userProfile.imageUrl;
+            } else {
+              console.warn(`No user profile found for member ${member.userId} in cart ${args.cartId}`);
+            }
+          } catch (error) {
             console.error(`Error fetching user profile for member ${member.userId} in cart ${args.cartId}:`, error);
-            // Keep default values
-        }
-        return {
-          ...member,
-          name: name,
-          imageUrl: imageUrl, // Add imageUrl from the user profile
-        };
-      })
-    );
+          }
+          return {
+            ...member,
+            name,
+            imageUrl,
+          };
+        })
+      );
 
-    return {
-      ...cart,
-      members: membersWithDetails, // Return enriched members
-      items: itemsWithDetails,     // Return enriched items
-    };
+      return {
+        ...cart,
+        members: membersWithDetails,
+        items: itemsWithDetails,
+      };
+    } catch (err) {
+      console.error("getSharedCart: Unexpected error", err);
+      return null;
+    }
   },
 });
 
@@ -892,5 +928,52 @@ export const setCartDeliveryZone = mutation({
 
     console.log(`[CONVEX M(sharedCarts:setDeliveryZone)] Successfully set delivery info for cart ${args.cartId}`);
     return { success: true, deliveryFee }; // Return fee for immediate display
+  },
+});
+
+/**
+ * INTERNAL: Creates a default shared cart for a new user.
+ * This is intended to be called after a user is created.
+ */
+export const createDefaultSharedCartForUser = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, { userId }) => {
+    // 1. Find a default branch to associate the cart with.
+    //    This could be the first branch created, or one marked as 'default'.
+    const defaultBranch = await ctx.db.query("branches").first();
+
+    if (!defaultBranch) {
+      console.error("Cannot create default shared cart: No branches found in the database.");
+      // Depending on requirements, you might throw an error or just log this.
+      // For now, we'll stop execution for this user if no branch is available.
+      return;
+    }
+
+    // 2. Generate an invite code
+    const inviteCode = nanoid(8);
+
+    // 3. Create the shared cart with default values
+    const cartId = await ctx.db.insert("sharedCarts", {
+      initiatorId: userId,
+      branchId: defaultBranch._id, // Use the ID of the found branch
+      status: "open",
+      paymentMode: "split", // Sensible default
+      orderType: "Take-out", // Sensible default
+      inviteCode: inviteCode,
+      totalAmount: 0,
+      createdAt: Date.now(),
+    });
+
+    // 4. Add the new user as the first member of their own cart
+    await ctx.db.insert("sharedCartMembers", {
+      cartId: cartId,
+      userId: userId,
+      paymentStatus: "pending",
+      amountDue: 0,
+    });
+
+    console.log(`Created default shared cart ${cartId} for new user ${userId} with invite code ${inviteCode}`);
+
+    return { cartId, inviteCode };
   },
 });

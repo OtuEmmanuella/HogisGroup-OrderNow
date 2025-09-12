@@ -11,6 +11,7 @@ export interface CartItem {
 
 export interface UseShoppingCartReturn {
   cartItems: CartItem[];
+  setCartItems: (items: CartItem[]) => void; // Add this setter
   addToCart: (item: { _id: Id<'menuItems'>; name: string; price: number }) => void;
   removeFromCart: (itemId: Id<'menuItems'>) => void;
   decrementItem: (itemId: Id<'menuItems'>) => void;
@@ -105,6 +106,7 @@ export function useShoppingCart(): UseShoppingCartReturn {
 
   return {
     cartItems,
+    setCartItems, // Expose the new setter
     addToCart,
     removeFromCart,
     decrementItem,

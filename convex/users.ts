@@ -99,13 +99,18 @@ export const createUserInternal = internalMutation({
         role: v.optional(v.union(v.literal("admin"), v.literal("customer"))),
     },
     handler: async (ctx, { userId, email, name, imageUrl, role }) => {
-        await ctx.db.insert("users", {
+        const newUserId = await ctx.db.insert("users", {
             userId,
             email,
             name: name ?? "",
             imageUrl,
             credits: 0,
             role: role ?? "customer",
+        });
+
+        // After creating the user, schedule the creation of their default shared cart
+        await ctx.scheduler.runAfter(0, internal.sharedCarts.createDefaultSharedCartForUser, {
+            userId: userId,
         });
     },
 });
