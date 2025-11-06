@@ -253,7 +253,6 @@ interface MenuDisplayProps {
 export default function MenuDisplay({ selectedCategoryId }: MenuDisplayProps) {
   const categories = useQuery(api.menu.getAllCategories);
   const { addToCart, activeSharedCartId } = useOrderContext(); // Get activeSharedCartId
-  const addSharedItem = useMutation(api.sharedCarts.addSharedCartItem); // Hook for shared cart mutation
   const [addingItemId, setAddingItemId] = useState<Id<"menuItems"> | null>(null); // State to track which item is being added
 
   // Fetch in-menu banners
@@ -263,25 +262,13 @@ export default function MenuDisplay({ selectedCategoryId }: MenuDisplayProps) {
   const handleAddToCart = async (item: { _id: Id<"menuItems">; name: string; price: number }) => {
     setAddingItemId(item._id); // Set loading state for this item
     try {
-      if (activeSharedCartId) {
-        // If in a shared cart, add to the shared cart via mutation
-        await addSharedItem({
-          cartId: activeSharedCartId,
-          menuItemId: item._id,
-          quantity: 1, // Assuming adding 1 at a time for now
-          // unitPrice is handled server-side in the mutation
-        });
-        toast.success(`${item.name} added to group order.`);
-      } else {
-        // Otherwise, add to the regular local cart using context
-        addToCart({
-          _id: item._id,
-          name: item.name,
-          price: item.price
-        });
-        // Add success toast for regular cart addition
-        toast.success(`${item.name} added to cart.`);
-      }
+      // Use context addToCart for both personal and shared carts so it upserts correctly
+      await Promise.resolve(addToCart({
+        _id: item._id,
+        name: item.name,
+        price: item.price
+      }));
+      toast.success(`${item.name} added${activeSharedCartId ? ' to group order' : ''}.`);
     } catch (error) {
         console.error("Failed to add item:", error);
         toast.error(`Failed to add ${item.name}: ${error instanceof Error ? error.message : "Unknown error"}`);

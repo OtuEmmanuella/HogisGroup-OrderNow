@@ -36,7 +36,7 @@ export default function SharedCartPage() {
   const params = useParams();
   const router = useRouter();
   const { userId, isSignedIn, isLoaded } = useAuth();
-  const { setActiveSharedCartId } = useOrderContext(); // Get setter from context
+  const { setActiveSharedCartId, setBranchForSharedCart, setSelectedOrderType } = useOrderContext(); // Get setters from context
   const cartId = params.cartId as Id<'sharedCarts'>;
 
   const [isRemovingItem, setIsRemovingItem] = useState<Id<'sharedCartItems'> | null>(null);
@@ -292,7 +292,20 @@ export default function SharedCartPage() {
 
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
         <h1 className="text-3xl font-bold">Group Order</h1>
-        <Button variant="outline" onClick={() => router.push('/home')} disabled={!canModifyCart}>
+        <Button 
+          variant="outline" 
+          onClick={() => {
+            // Use the new context function to set the branch without resetting the cart
+            if (cart.branchId) {
+              setBranchForSharedCart(cart.branchId);
+            }
+            if (cart.orderType) {
+              setSelectedOrderType(cart.orderType);
+            }
+            router.push('/home');
+          }}
+          disabled={!canModifyCart}
+        >
           <PlusCircle className="mr-2 h-4 w-4" /> Add More Items
         </Button>
       </div>

@@ -16,6 +16,7 @@ interface OrderContextState extends UseShoppingCartReturn {
   setSelectedBranchId: (branchId: Id<'branches'> | null) => void;
   setSelectedOrderType: (orderType: OrderType | null) => void;
   setActiveSharedCartId: (cartId: Id<'sharedCarts'> | null) => void; // Add setter
+  setBranchForSharedCart: (branchId: Id<'branches'>) => void;
   resetOrderFlow: () => void;
   isInitialized: boolean;
 }
@@ -90,6 +91,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, [isSignedIn, activeSharedCartId]);
 
+  // When a shared cart is active, automatically set the branch from its data
+  useEffect(() => {
+    if (activeSharedCartId && sharedCartData?.branchId && selectedBranchId !== sharedCartData.branchId) {
+      _setSelectedBranchId(sharedCartData.branchId);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('selectedBranchId', sharedCartData.branchId);
+      }
+    }
+  }, [activeSharedCartId, sharedCartData?.branchId, selectedBranchId]);
+
   // Synchronize the local cart with the user's items from the shared cart
   useEffect(() => {
     if (activeSharedCartId && sharedCartData && user) {
@@ -148,6 +159,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setBranchForSharedCart = useCallback((branchId: Id<'branches'>) => {
+    _setSelectedBranchId(branchId);
+    if (branchId) {
+      localStorage.setItem('selectedBranchId', branchId);
+    } else {
+      localStorage.removeItem('selectedBranchId');
+    }
+    // This version does NOT reset the shared cart ID
+  }, []);
+
   const resetOrderFlow = useCallback(() => {
     _setSelectedBranchId(null);
     _setSelectedOrderType(null);
@@ -165,28 +186,41 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
   const addToCart = useCallback((item: { _id: Id<"menuItems">; name: string; price: number }) => {
     if (activeSharedCartId) {
-      // If in a shared cart, call the mutation
-      addSharedItem({
+      // Prefer incrementing existing shared item to avoid duplicates; fallback to add if not found
+      updateSharedItem({
         cartId: activeSharedCartId,
         menuItemId: item._id,
-        quantity: 1, // Add one at a time
-      }).catch(err => console.error("Failed to add shared item", err));
+        quantity: 1,
+      })
+        .catch(async (err) => {
+          // If item not found for this user, create it
+          try {
+            await addSharedItem({
+              cartId: activeSharedCartId,
+              menuItemId: item._id,
+              quantity: 1,
+            });
+          } catch (e) {
+            console.error("Failed to add shared item after update fallback", e);
+          }
+        });
     } else {
       // Otherwise, use the local cart function
       shoppingCart.addToCart(item);
     }
-  }, [activeSharedCartId, addSharedItem, shoppingCart.addToCart]);
+  }, [activeSharedCartId, updateSharedItem, addSharedItem, shoppingCart.addToCart]);
 
   const decrementItem = useCallback((itemId: Id<"menuItems">) => {
     if (activeSharedCartId) {
-      // If in a shared cart, call the update mutation with negative quantity
       updateSharedItem({
         cartId: activeSharedCartId,
         menuItemId: itemId,
         quantity: -1,
-      }).catch(err => console.error("Failed to decrement shared item", err));
+      })
+        .catch(err => {
+          console.error("Failed to decrement shared item", err);
+        });
     } else {
-      // Otherwise, use the local cart function
       shoppingCart.decrementItem(itemId);
     }
   }, [activeSharedCartId, updateSharedItem, shoppingCart.decrementItem]);
@@ -217,6 +251,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     setSelectedBranchId,
     setSelectedOrderType,
     setActiveSharedCartId, // Provide setter
+    setBranchForSharedCart,
     resetOrderFlow,
     isInitialized,
     ...shoppingCart,

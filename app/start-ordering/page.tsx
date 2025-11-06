@@ -11,7 +11,7 @@ import { Id } from '@/convex/_generated/dataModel';
 import Image from 'next/image';
 import logo from '@/images/logo.webp';
 import { useAuth } from '@clerk/nextjs';
-import { useMutation } from 'convex/react';
+import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { toast } from 'sonner';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -42,6 +42,7 @@ export default function StartOrderingPage() {
   const { isSignedIn, isLoaded } = useAuth();
   const createSharedCart = useMutation(api.sharedCarts.createSharedCart);
   const joinSharedCart = useMutation(api.sharedCarts.joinSharedCart);
+  const validateInviteCode = useQuery(api.sharedCarts.validateInviteCode, { inviteCode: inviteCodeInput.trim() });
 
   // Normalize state on dependency changes
   useEffect(() => {
@@ -125,20 +126,29 @@ export default function StartOrderingPage() {
       toast.warning("Please enter an invite code.");
       return;
     }
-    if (!isSignedIn) {
-      localStorage.setItem('inviteCode', inviteCodeInput.trim());
-      toast.info("Please sign in to join the group order.");
-      window.location.href = `/sign-in?redirect_url=/auth-callback`;
-      return;
-    }
 
     setIsJoiningCart(true);
     try {
+      // First, validate the invite code without requiring sign-in
+      const validation = await validateInviteCode;
+
+      if (!validation?.isValid) {
+        toast.error(validation?.message || "Invalid invite code.");
+        return;
+      }
+
+      // If the code is valid and the user is not signed in, redirect them
+      if (!isSignedIn) {
+        localStorage.setItem('inviteCode', inviteCodeInput.trim());
+        toast.info("Please sign in to join the group order.");
+        window.location.href = `/sign-in?redirect_url=/auth-callback`;
+        return;
+      }
+
+      // If the user is already signed in, proceed to join the cart
       const result = await joinSharedCart({ inviteCode: inviteCodeInput.trim() });
-      // Set the active shared cart ID in the context
       setActiveSharedCartId(result.cartId);
       toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
-      // Redirect to the shared cart page
       router.push(`/shared-cart/${result.cartId}`);
     } catch (error) {
       console.error("Failed to join shared cart:", error);

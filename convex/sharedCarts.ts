@@ -138,10 +138,22 @@ export const joinSharedCart = mutation({
       return { cartId: cart._id, alreadyMember: true };
     }
 
+    // Fetch the user's profile to get their name
+    const userProfile = await ctx.db
+      .query("users")
+      .withIndex("by_user_id", (q) => q.eq("userId", user.userId))
+      .first();
+
+    if (!userProfile) {
+      throw new Error("User profile not found.");
+    }
+
     // Add the user as a new member
     await ctx.db.insert("sharedCartMembers", {
       cartId: cart._id,
       userId: user.userId,
+      userName: userProfile.name,
+      userEmail: userProfile.email,
       paymentStatus: "pending",
       amountDue: 0,
     });
@@ -426,6 +438,35 @@ export const internalUpdateSharedCartPaymentStatus = internalMutation({
   },
 });
 
+
+/**
+ * PUBLIC QUERY: Checks if an invite code is valid and the cart is open.
+ * Does not require authentication.
+ */
+export const validateInviteCode = query({
+  args: {
+    inviteCode: v.string(),
+  },
+  handler: async (ctx, args) => {
+    if (!args.inviteCode) {
+      return { isValid: false, message: "Invite code cannot be empty." };
+    }
+    const cart = await ctx.db
+      .query("sharedCarts")
+      .withIndex("by_invite_code", (q) => q.eq("inviteCode", args.inviteCode))
+      .first();
+
+    if (!cart) {
+      return { isValid: false, message: "Invalid invite code." };
+    }
+
+    if (cart.status !== "open") {
+      return { isValid: false, message: "This cart is no longer open for joining." };
+    }
+
+    return { isValid: true };
+  },
+});
 
 // --- Queries ---
 
