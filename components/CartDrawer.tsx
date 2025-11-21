@@ -11,6 +11,7 @@ import { MinusCircle, PlusCircle, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { Id } from '@/convex/_generated/dataModel';
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,6 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
 
 export default function CartDrawer() {
@@ -49,13 +49,14 @@ export default function CartDrawer() {
     console.log("[CartDrawer] Received isCartDrawerOpen:", isCartDrawerOpen);
   }, [isCartDrawerOpen]);
 
+  // FIXED: Proper currency formatting that divides by 100 for kobo to Naira conversion
   const formatPrice = (amountKobo: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amountKobo);
+    }).format(amountKobo / 100); // CRITICAL FIX: Divide by 100 to convert kobo to Naira
   };
 
   const handleCheckoutClick = () => {
@@ -64,6 +65,21 @@ export default function CartDrawer() {
       return;
     }
     closeCartDrawer();
+  };
+
+  // FIXED: Proper increment handler - adds one more of the same item
+  const handleIncrement = (item: any) => {
+    addToCart({ _id: item._id, name: item.name, price: item.price });
+  };
+
+  // FIXED: Proper decrement handler with type casting
+  const handleDecrement = (itemId: string) => {
+    decrementItem(itemId as Id<"menuItems">);
+  };
+
+  // FIXED: Proper delete handler with type casting
+  const handleDelete = (itemId: string) => {
+    removeFromCart(itemId as Id<"menuItems">);
   };
 
   return (
@@ -102,32 +118,42 @@ export default function CartDrawer() {
                     </div>
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                       <div className="flex items-center gap-1">
+                        {/* FIXED: Decrement button - shows trash icon when quantity is 1 */}
                         <Button 
                           variant="outline" 
                           size="icon" 
                           className="h-6 w-6 rounded-full"
-                          onClick={() => decrementItem(item._id)}
+                          onClick={() => handleDecrement(item._id)}
+                          title={item.quantity === 1 ? "Remove item" : "Decrease quantity"}
                         >
-                           <MinusCircle className="h-3.5 w-3.5" />
+                          {item.quantity === 1 ? (
+                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                          ) : (
+                            <MinusCircle className="h-3.5 w-3.5" />
+                          )}
                         </Button>
                         <span className="text-sm font-medium w-6 text-center tabular-nums">{item.quantity}</span>
+                        {/* FIXED: Increment button - properly increases quantity */}
                         <Button 
                           variant="outline" 
                           size="icon" 
                           className="h-6 w-6 rounded-full"
-                          onClick={() => addToCart({ _id: item._id, name: item.name, price: item.price })}
+                          onClick={() => handleIncrement(item)}
+                          title="Increase quantity"
                         >
                           <PlusCircle className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                       <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-muted-foreground hover:text-destructive ml-1"
-                          onClick={() => removeFromCart(item._id)}
-                        >
-                           <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
+                      {/* FIXED: Delete button - completely removes the item */}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6 text-muted-foreground hover:text-destructive ml-1"
+                        onClick={() => handleDelete(item._id)}
+                        title="Remove item completely"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
                 ))}
