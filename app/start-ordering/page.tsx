@@ -42,7 +42,14 @@ export default function StartOrderingPage() {
   const { isSignedIn, isLoaded } = useAuth();
   const createSharedCart = useMutation(api.sharedCarts.createSharedCart);
   const joinSharedCart = useMutation(api.sharedCarts.joinSharedCart);
-  const validateInviteCode = useQuery(api.sharedCarts.validateInviteCode, { inviteCode: inviteCodeInput.trim() });
+  
+  // FIX: Only validate when there's meaningful input (at least 4 characters for a valid code)
+  const trimmedInviteCode = inviteCodeInput.trim();
+  const shouldValidate = trimmedInviteCode.length >= 4; // Adjust length based on your code format
+  const validateInviteCode = useQuery(
+    api.sharedCarts.validateInviteCode, 
+    shouldValidate ? { inviteCode: trimmedInviteCode } : 'skip'
+  );
 
   // Normalize state on dependency changes
   useEffect(() => {
@@ -122,31 +129,40 @@ export default function StartOrderingPage() {
   };
 
   const handleJoinCart = async () => {
-    if (!inviteCodeInput.trim()) {
-      toast.warning("Please enter an invite code.");
+    const trimmed = inviteCodeInput.trim();
+    
+    if (!trimmed || trimmed.length < 4) {
+      toast.warning("Please enter a valid invite code.");
+      return;
+    }
+
+    // If not signed in, store the code and redirect
+    if (!isSignedIn) {
+      localStorage.setItem('inviteCode', trimmed);
+      toast.info("Please sign in to join the group order.");
+      router.push('/sign-in?redirect_url=/auth-callback');
       return;
     }
 
     setIsJoiningCart(true);
     try {
-      // First, validate the invite code without requiring sign-in
-      const validation = await validateInviteCode;
-
-      if (!validation?.isValid) {
-        toast.error(validation?.message || "Invalid invite code.");
+      // Check validation result if we validated
+      if (shouldValidate && validateInviteCode === undefined) {
+        toast.info("Validating invite code...");
+        setIsJoiningCart(false);
         return;
       }
 
-      // If the code is valid and the user is not signed in, redirect them
-      if (!isSignedIn) {
-        localStorage.setItem('inviteCode', inviteCodeInput.trim());
-        toast.info("Please sign in to join the group order.");
-        window.location.href = `/sign-in?redirect_url=/auth-callback`;
-        return;
+      if (shouldValidate) {
+        if (validateInviteCode === null || (validateInviteCode && !validateInviteCode.isValid)) {
+          toast.error(validateInviteCode?.message || "Invalid invite code.");
+          setIsJoiningCart(false);
+          return;
+        }
       }
 
-      // If the user is already signed in, proceed to join the cart
-      const result = await joinSharedCart({ inviteCode: inviteCodeInput.trim() });
+      // User is signed in, proceed to join the cart
+      const result = await joinSharedCart({ inviteCode: trimmed });
       setActiveSharedCartId(result.cartId);
       toast.success(result.alreadyMember ? "You are already in this cart." : "Successfully joined the cart!");
       router.push(`/shared-cart/${result.cartId}`);
@@ -305,13 +321,18 @@ export default function StartOrderingPage() {
                       placeholder="Enter invite code"
                       value={inviteCodeInput}
                       onChange={(e) => setInviteCodeInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && trimmedInviteCode.length >= 4) {
+                          handleJoinCart();
+                        }
+                      }}
                       className="flex-1"
                       disabled={isJoiningCart}
                     />
                     <Button
                       variant="secondary"
                       onClick={handleJoinCart}
-                      disabled={isJoiningCart || !inviteCodeInput.trim()}
+                      disabled={isJoiningCart || trimmedInviteCode.length < 4}
                     >
                       {isJoiningCart ? "Joining..." : "Join"}
                     </Button>
@@ -376,7 +397,6 @@ export default function StartOrderingPage() {
                 >
                   <div className="relative">
                     <RadioGroupItem value="individual" id="individual" className="peer sr-only" />
-                    {/* Gradient border container */}
                     <div 
                       className={`absolute inset-0 rounded-lg transition-opacity duration-200 ${
                         orderingMode === 'individual' 
@@ -384,7 +404,6 @@ export default function StartOrderingPage() {
                           : 'opacity-0'
                       }`}
                     />
-                    {/* Inner content with padding to show border */}
                     <div className={`relative ${orderingMode === 'individual' ? 'p-0.5' : ''}`}>
                       <Label htmlFor="individual" className="cursor-pointer">
                         <Card className={`transition-all hover:bg-gray-50 h-auto ${
@@ -408,7 +427,6 @@ export default function StartOrderingPage() {
 
                   <div className="relative">
                     <RadioGroupItem value="group" id="group" className="peer sr-only" />
-                    {/* Gradient border container */}
                     <div 
                       className={`absolute inset-0 rounded-lg transition-opacity duration-200 ${
                         orderingMode === 'group' 
@@ -416,7 +434,6 @@ export default function StartOrderingPage() {
                           : 'opacity-0'
                       }`}
                     />
-                    {/* Inner content with padding to show border */}
                     <div className={`relative ${orderingMode === 'group' ? 'p-0.5' : ''}`}>
                       <Label htmlFor="group" className="cursor-pointer">
                         <Card className={`transition-all hover:bg-gray-50 h-auto ${
